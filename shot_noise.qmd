@@ -1,0 +1,245 @@
+---
+title: "Shot Noise Analysis"
+author: "Kantnerova et al. (2023)"
+date: "`r format(Sys.Date(), '%d %b %Y')`"
+number-sections: false
+toc: true
+toc-depth: 2
+fig-width: 8
+fig-height: 6
+df-print: tibble
+embed-resources: true
+format: 
+  html: 
+    code-tools: true
+    code-fold: false
+    code-summary: "Show the code"
+    toc-float: true
+bibliography: references.bib
+crossref:
+  fig-prefix: Fig.
+  tbl-prefix: Table
+  ref-hyperlink: true
+editor: source
+editor_options: 
+  chunk_output_type: console
+---
+
+# Setup
+
+Using `r R.version.string` , @R, tidyverse version `r packageVersion("tidyverse")`, @tidyverse, and isoorbi version `r packageVersion("isoorbi")`.
+
+```{r}
+#| label: setup
+#| message: false
+
+# load packages
+library(isoorbi) # for orbitrap function
+library(dplyr) # for mutating data frames
+library(forcats) # for recoding factors
+library(ggplot2) # for data visualization
+library(cowplot) # arrange multipanel plots
+```
+
+```{r, include=FALSE}
+# global knitting options for code rendering
+knitr::opts_chunk$set(
+  collapse = TRUE, comment = "#>",
+  dev = c("png", "pdf"), fig.keep = "all",
+  dev.args = list(pdf = list(encoding = "WinAnsi", useDingbats = FALSE)),
+  fig.path = sprintf("plots/%s_", gsub("\\.qmd", "", knitr::current_input()))
+)
+```
+
+# Trifluoroacetate (TFA)
+
+## Data
+
+```{r}
+# load, process, and export tfa data
+shot_noise_tfa <-
+  "data/shot_noise/tfa" |>
+  orbi_find_isox() |>
+  orbi_read_isox() |>
+  orbi_simplify_isox() |>
+  orbi_filter_satellite_peaks() |>
+  orbi_filter_weak_isotopocules(min_percent = 10) |>
+  orbi_filter_scan_intensity(outlier_percent = 2.1) |>
+  orbi_define_basepeak("M0") |>
+  orbi_analyze_shot_noise() |>
+  orbi_export_data_to_excel("output/shot_noise_tfa.xlsx")
+```
+
+## Figure 15: TFA shotnoise vs counts/time
+
+```{r}
+#| label: fig-15-shotnoise-tfa
+#| fig-cap: Shot noise vs counts and vs time.
+#| fig-width: 10
+#| fig-height: 5
+#| warning: false
+
+# individual plots
+tfa_vs_ions <- 
+  shot_noise_tfa |>
+  orbi_filter_isox(filename = "TFA_M0_1uscan_15kRes") |>
+  orbi_plot_shot_noise(x = "n_effective_ions")
+tfa_vs_time <- 
+  shot_noise_tfa |>
+  orbi_filter_isox(filename = "TFA_M0_1uscan_15kRes") |>
+  orbi_plot_shot_noise(permil_target = 1)
+
+# combine
+plot_grid(
+  tfa_vs_ions + facet_wrap(~"vs counts") + 
+    theme(legend.position = c(0.85, 0.74)), 
+  tfa_vs_time + facet_wrap(~"vs time") + 
+    theme(legend.position = "none"),
+  align = "h", nrow = 1, axis = "tb"
+)
+```
+
+## Figure 16: TFA shotnoise at differen TI
+
+```{r}
+#| label: fig-15-shotnoise-tfa-ITs
+#| fig-cap: Shot noise at different ITs.
+#| fig-width: 10
+#| fig-height: 5.5
+#| warning: false
+shot_noise_tfa |>
+  orbi_filter_isox(filename = c("TFA_1E4_AGC", "TFA_M0_1uscan_15kRes")) |>
+  # change color legend
+  mutate(
+    IT_info = filename |>
+      fct_recode(
+        "IT = 0.03 ms" = "TFA_1E4_AGC",
+        "IT = 0.75 ms" = "TFA_M0_1uscan_15kRes"
+      )
+  ) |>
+  orbi_plot_shot_noise(color = "IT_info") +
+  # wrap by the ratio label
+  facet_wrap(~ratio_label) +
+  theme(legend.position = c(0.41, 0.77))
+```
+
+## Figure 17: TFA shotnoise at resolutions
+
+```{r}
+#| label: fig-15-shotnoise-tfa-resolution
+#| fig-cap: Shot noise at different resolutions.
+#| fig-width: 10
+#| fig-height: 5.5
+#| warning: false
+shot_noise_tfa |>
+  orbi_filter_isox(filename = c("TFA_M0_1uscan_120kRes", "TFA_M0_1uscan_15kRes")) |>
+  # change color legend
+  mutate(
+    res_info = filename |>
+      fct_recode(
+        "res. = 120k" = "TFA_M0_1uscan_120kRes",
+        "res. = 15k" = "TFA_M0_1uscan_15kRes"
+      )
+  ) |>
+  orbi_plot_shot_noise(color = "res_info") +
+  # wrap by the ratio label
+  facet_wrap(~ratio_label) +
+  theme(legend.position = c(0.42, 0.77))
+```
+
+# Model Peptide (MRFA)
+
+## Data
+
+```{r}
+shot_noise_aas <-
+  "data/shot_noise/mrfa/MRFA_M1_40NCE_10min_10uscans.isox" |>
+  orbi_read_isox() |>
+  orbi_simplify_isox() |>
+  
+  
+  # implement: orbi_flag_satellite_peaks() |>
+  # implement: orbi_flag_weak_isotopocules() |>
+  
+  orbi_filter_satellite_peaks() |>
+  orbi_filter_weak_isotopocules(min_percent = 10) |>
+  
+  
+  # switch to: orbi_flag_outliers(intensity_window = c(2, 98))
+  # deprecate: orbi_filter_scan_intensity(outlier_percent = 2.1) |>
+  
+  
+  # implement: orbi_remove_flagged_data() |>
+  #dplyr::filter(!satellite, !weak, !outlier) |>
+  
+  
+  orbi_define_basepeak("M0") |>
+  orbi_analyze_shot_noise() |>
+  orbi_export_data_to_excel("output/shot_noise_amino_acids.xlsx")
+```
+
+## Table
+
+```{r}
+# example of first few rows
+shot_noise_aas |>
+  arrange(compound, isotopocule, scan.no) |>
+  head(10) |>
+  select(compound, scan.no, time.min, isotopocule, 
+         ratio, ratio_rel_se.permil, shot_noise.permil) |>
+  knitr::kable()
+```
+
+## Figure 18: Amino Acids Shot Noise
+
+```{r}
+#| label: fig-18-shotnoise-mrfa
+#| fig-cap: amino acids shotnoise
+#| warning: false
+#| fig-width: 8
+#| fig-height: 9
+shot_noise_aas |>
+  filter(compound == "Met_imm" | isotopocule != "2H") |>
+  # change panel titles
+  mutate(
+    compound = compound |>
+      fct_recode(
+        "Alanine" = "Ala_imm",
+        "Arginine" = "Arg_imm",
+        "Methionine" = "Met_imm",
+        "Phenylalanine" = "Phe_imm"
+      )
+  ) |>
+  # x-axis parameter --> allow flexibility with this
+  orbi_plot_shot_noise()
+```
+
+
+# Figure 19: FIXME continue here
+
+```{r, eval = FALSE}
+data <- 
+  "data/mrfa/replicates/data" |>
+  orbi_find_isox() |>
+  orbi_read_isox()
+
+data |>
+  orbi_filter_satellite_peaks() |>
+  #orbi_define_basepeak("M0") |>
+  filter(isotopocule == "M0") |>
+  ggplot() +
+  aes(time.min, intensity, color = compound) +
+  geom_line() +
+  scale_y_log10() +
+  facet_wrap(~filename)
+```
+
+
+# Figure 20
+
+```{r}
+
+```
+
+
+# References
