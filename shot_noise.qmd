@@ -62,10 +62,11 @@ shot_noise_tfa <-
   orbi_find_isox() |>
   orbi_read_isox() |>
   orbi_simplify_isox() |>
-  orbi_filter_satellite_peaks() |>
-  orbi_filter_weak_isotopocules(min_percent = 10) |>
-  orbi_filter_scan_intensity(outlier_percent = 2.1) |>
+  orbi_flag_satellite_peaks() |>
+  orbi_flag_weak_isotopocules(min_percent = 10) |>
+  orbi_flag_outliers(intensity_window = c(2.1, 97.9)) |>
   orbi_define_basepeak("M0") |>
+  orbi_filter_flagged_data() |>
   orbi_analyze_shot_noise() |>
   orbi_export_data_to_excel("output/shot_noise_tfa.xlsx")
 ```
@@ -156,24 +157,11 @@ shot_noise_aas <-
   "data/shot_noise/mrfa/MRFA_M1_40NCE_10min_10uscans.isox" |>
   orbi_read_isox() |>
   orbi_simplify_isox() |>
-  
-  
-  # implement: orbi_flag_satellite_peaks() |>
-  # implement: orbi_flag_weak_isotopocules() |>
-  
-  orbi_filter_satellite_peaks() |>
-  orbi_filter_weak_isotopocules(min_percent = 10) |>
-  
-  
-  # switch to: orbi_flag_outliers(intensity_window = c(2, 98))
-  # deprecate: orbi_filter_scan_intensity(outlier_percent = 2.1) |>
-  
-  
-  # implement: orbi_remove_flagged_data() |>
-  #dplyr::filter(!satellite, !weak, !outlier) |>
-  
-  
+  orbi_flag_satellite_peaks() |>
+  orbi_flag_weak_isotopocules(min_percent = 10) |>
+  orbi_flag_outliers(intensity_window = c(2.1, 97.9)) |>
   orbi_define_basepeak("M0") |>
+  orbi_filter_flagged_data() |>
   orbi_analyze_shot_noise() |>
   orbi_export_data_to_excel("output/shot_noise_amino_acids.xlsx")
 ```
