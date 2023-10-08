@@ -198,36 +198,7 @@ shot_noise_aas |>
         "Phenylalanine" = "Phe_imm"
       )
   ) |>
-  # x-axis parameter --> allow flexibility with this
   orbi_plot_shot_noise()
 ```
-
-
-# Figure 19: FIXME continue here
-
-```{r, eval = FALSE}
-data <- 
-  "data/mrfa/replicates/data" |>
-  orbi_find_isox() |>
-  orbi_read_isox()
-
-data |>
-  orbi_filter_satellite_peaks() |>
-  #orbi_define_basepeak("M0") |>
-  filter(isotopocule == "M0") |>
-  ggplot() +
-  aes(time.min, intensity, color = compound) +
-  geom_line() +
-  scale_y_log10() +
-  facet_wrap(~filename)
-```
-
-
-# Figure 20
-
-```{r}
-
-```
-
 
 # References
