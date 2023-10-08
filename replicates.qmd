@@ -76,6 +76,13 @@ data <-
         "Phenylalanine" = "Phe_imm"
       )
   )
+
+# calculate ratios for 13C/M0
+ratios <- data |>
+  orbi_define_basepeak("M0") |>
+  orbi_filter_isox(isotopocules = "13C") |>
+  group_by(replicate) |>
+  orbi_summarize_results(ratio_method = "sum") 
 ```
 
 # Figure 19 top panel
@@ -111,14 +118,6 @@ p_top
 # Figure 19 bottom panel
 
 ```{r}
-# calculate ratios
-ratios <- data |>
-  orbi_define_basepeak("M0") |>
-  orbi_filter_isox(isotopocules = "13C") |>
-  group_by(replicate) |>
-  orbi_summarize_results(ratio_method = "mean") 
-
-# plot
 p_bottom <- 
   ratios |>
   ggplot() +
