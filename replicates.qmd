@@ -151,6 +151,7 @@ p_bottom <-
   # scales
   scale_color_brewer(palette = "Dark2") +
   scale_shape_manual(values = c(21:25)) +
+  scale_y_continuous(breaks = scales::pretty_breaks(3)) +
   # labels
   labs(x = NULL, color = NULL, shape = NULL,
        y = expression("ratio ("^13*C/M0*")")) +
