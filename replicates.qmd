@@ -1,0 +1,184 @@
+---
+title: "Replicates"
+author: "Kantnerova et al. (2023)"
+date: "`r format(Sys.Date(), '%d %b %Y')`"
+number-sections: false
+toc: true
+toc-depth: 2
+fig-width: 8
+fig-height: 6
+df-print: tibble
+embed-resources: true
+format: 
+  html: 
+    code-tools: true
+    code-fold: false
+    code-summary: "Show the code"
+    toc-float: true
+bibliography: references.bib
+crossref:
+  fig-prefix: Fig.
+  tbl-prefix: Table
+  ref-hyperlink: true
+editor: source
+editor_options: 
+  chunk_output_type: console
+---
+
+# Setup
+
+Using `r R.version.string` , @R, tidyverse version `r packageVersion("tidyverse")`, @tidyverse, and isoorbi version `r packageVersion("isoorbi")`.
+
+```{r}
+#| label: setup
+#| message: false
+
+# load packages
+library(isoorbi) # for orbitrap function
+library(dplyr) # for mutating data frames
+library(stringr) # for extarcting text information
+library(forcats) # for recoding factors
+library(ggplot2) # for data visualization
+library(cowplot) # arrange multipanel plots
+```
+
+```{r, include=FALSE}
+# global knitting options for code rendering
+knitr::opts_chunk$set(
+  collapse = TRUE, comment = "#>",
+  dev = c("png", "pdf"), fig.keep = "all",
+  dev.args = list(pdf = list(encoding = "WinAnsi", useDingbats = FALSE)),
+  fig.path = sprintf("plots/%s_", gsub("\\.qmd", "", knitr::current_input()))
+)
+```
+
+# Data
+
+```{r}
+# isotopocules data
+data <- 
+  "data/replicates" |>
+  orbi_find_isox() |>
+  orbi_read_isox() |>
+  orbi_flag_satellite_peaks() |>
+  orbi_filter_flagged_data() |>
+  # pull out replicate from filename
+  mutate(
+    replicate = str_extract(filename, "Replicate_\\d") |> str_replace("_", " ")
+  ) |>
+  # expand amino acid names
+  mutate(
+    compound = compound |>
+      fct_recode(
+        "Alanine" = "Ala_imm",
+        "Arginine" = "Arg_imm",
+        "Methionine" = "Met_imm",
+        "Phenylalanine" = "Phe_imm"
+      )
+  )
+```
+
+# Figure 19 top panel
+
+```{r}
+p_top <- 
+  data |>
+  filter(isotopocule == "M0") |>
+  # plot setup
+  ggplot() +
+  aes(time.min, intensity, color = compound) + 
+  geom_line() +
+  facet_grid(. ~ replicate) +
+  # scales
+  scale_y_log10(
+    breaks = c(5e6, 1e7, 2e7), 
+    labels = expression(5%*%10^6, 1%*%10^7, 2%*%10^7)) +
+  scale_color_brewer(palette = "Dark2") +
+  scale_x_continuous(breaks = c(5, 10), expand = c(0, 0)) +
+  expand_limits(x = 0) + 
+  # labels 
+  labs(x = "time [min]", y = "EIC [arb. unit]") +
+  # theme
+  theme_bw() +
+  theme(
+    text = element_text(size = 16),
+    panel.grid = element_blank(),
+    strip.background = element_blank()
+  )
+p_top
+```
+
+# Figure 19 bottom panel
+
+```{r}
+# calculate ratios
+ratios <- data |>
+  orbi_define_basepeak("M0") |>
+  orbi_filter_isox(isotopocules = "13C") |>
+  group_by(replicate) |>
+  orbi_summarize_results(ratio_method = "mean") 
+
+# plot
+p_bottom <- 
+  ratios |>
+  ggplot() +
+  aes(
+    replicate, ratio, color = compound, shape = compound,
+    ymin = ratio - ratio_sem, ymax = ratio + ratio_sem
+  ) +
+  # standard deviations
+  geom_rect(
+    data = function(df) 
+      df |> group_by(compound) |>
+      summarize(ratio_mean = mean(ratio), ratio_sd = sd(ratio)),
+    map = aes(
+      ymin = ratio_mean - ratio_sd, ymax = ratio_mean + ratio_sd,
+      x = NULL, y = NULL, xmin = -Inf, xmax = +Inf, color = NULL),
+    fill = "gray90", show.legend = FALSE
+  ) +
+  # averages
+  geom_hline(
+    data = function(df) 
+      df |> group_by(compound) |>
+      summarize(ratio_mean = mean(ratio)),
+    map = aes(yintercept = ratio_mean, color = compound),
+    show.legend = FALSE
+  ) +
+  # data points
+  geom_errorbar(width = 0.1, show.legend = FALSE) + 
+  geom_point(fill = "white", size = 3) +
+  facet_grid(compound ~ ., scales = "free_y") +
+  # scales
+  scale_color_brewer(palette = "Dark2") +
+  scale_shape_manual(values = c(21:25)) +
+  # labels
+  labs(x = NULL, color = NULL, shape = NULL,
+       y = expression("ratio ("^13*C/M0*")")) +
+  # theme
+  theme_bw() +
+  theme(
+    text = element_text(size = 16),
+    panel.grid = element_blank(),
+    strip.background = element_blank(),
+    strip.text = element_blank(),
+    axis.ticks.x = element_blank(),
+    legend.position = "top"
+  )
+p_bottom
+```
+
+# Figure 19 combined
+
+```{r}
+#| label: fig-19-replicates
+#| fig-cap: amino acids replicates
+#| warning: false
+#| fig-width: 8
+#| fig-height: 8
+plot_grid(
+  p_top + theme(legend.position = "none"), p_bottom,
+  ncol = 1, rel_heights = c(1, 2), align = "v", axis = "lr"
+)
+```
+
+# References
