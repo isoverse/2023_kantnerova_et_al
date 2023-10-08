@@ -61,6 +61,8 @@ data <-
   orbi_find_isox() |>
   orbi_read_isox() |>
   orbi_flag_satellite_peaks() |>
+  orbi_flag_weak_isotopocules(min_percent = 30) |>
+  orbi_flag_outliers(intensity_window = c(5, 95)) |>
   orbi_filter_flagged_data() |>
   # pull out replicate from filename
   mutate(
