@@ -1,0 +1,258 @@
+---
+title: "Flow injection"
+author: "Kantnerova et al. (2023)"
+date: "`r format(Sys.Date(), '%d %b %Y')`"
+number-sections: false
+toc: true
+toc-depth: 2
+fig-width: 8
+fig-height: 6
+df-print: tibble
+embed-resources: true
+format: 
+  html: 
+    code-tools: true
+    code-fold: false
+    code-summary: "Show the code"
+    toc-float: true
+bibliography: references.bib
+crossref:
+  fig-prefix: Fig.
+  tbl-prefix: Table
+  ref-hyperlink: true
+editor: source
+editor_options: 
+  chunk_output_type: console
+---
+
+# Setup
+
+Using `r R.version.string` , @R, tidyverse version `r packageVersion("tidyverse")`, @tidyverse, and isoorbi version `r packageVersion("isoorbi")`.
+
+```{r}
+#| label: setup
+#| message: false
+
+# load packages
+# libraries
+library(isoorbi) # load isoorbi R package
+library(dplyr) # for mutating data frames
+library(stringr) # for extarcting text information
+library(ggplot2) # for data visualization
+library(cowplot) # arrange multipanel plots
+```
+
+```{r, include=FALSE}
+# global knitting options for code rendering
+knitr::opts_chunk$set(
+  collapse = TRUE, comment = "#>",
+  dev = c("png", "pdf"), fig.keep = "all",
+  dev.args = list(pdf = list(encoding = "WinAnsi", useDingbats = FALSE)),
+  fig.path = sprintf("plots/%s_", gsub("\\.rmarkdown", "", knitr::current_input()))
+)
+```
+
+# Data
+
+```{r}
+flow_injections <- 
+  "data/nitrate" |>
+  orbi_find_isox() |>
+  orbi_read_isox() |>
+  orbi_simplify_isox(add = "intensity") |>
+  # focus on the data of interest (18O and M0)
+  orbi_filter_isox(isotopocules = c("M0", "18O")) |>
+  # get injection number from end of filename
+  mutate(
+    injection = filename |> str_extract("\\d+$") |> as.integer(),
+    sample_name = ifelse(injection %% 2 == 0, "USGS35", "USGS32"),
+    .after = 1L
+  ) |>
+  # focus on injections with signal
+  filter(injection > 1, injection < 15) |>
+  # define data block
+  orbi_define_block(start_time.min = 0.5, end_time.min = 6.5)
+```
+
+# Calculations
+
+```{r}
+# with basepeak
+flow_injections_w_basepeak <- 
+  flow_injections |>
+  orbi_define_basepeak("M0")
+
+# ratios
+flow_injections_ratios <- 
+  flow_injections_w_basepeak |>
+  orbi_calculate_ratios()
+
+# ratio summary
+flow_injections_summary <- 
+  flow_injections_w_basepeak |>
+  orbi_summarize_results(ratio_method = "sum")
+
+# delta ratios
+delta_ratios <-
+  flow_injections_summary |>
+  filter(data_type == "data") |>
+  mutate(is_ref = sample_name == "USGS35") |>
+  select("is_ref", "injection", "ratio", "ratio_sem")
+
+# calculate deltas by bracketing
+deltas <- 
+  delta_ratios |>
+  filter(!is_ref) |>
+  cross_join(
+    delta_ratios |> 
+      filter(is_ref) |> 
+      select("ref_before" = "injection", "ref_before_ratio" = "ratio", 
+             "ref_before_ratio_sem" = "ratio_sem")) |>
+  filter(injection == ref_before + 1L) |>
+  cross_join(
+    delta_ratios |> 
+      filter(is_ref) |> 
+      select("ref_after" = "injection", "ref_after_ratio" = "ratio", 
+             "ref_after_ratio_sem" = "ratio_sem")) |>
+  filter(injection == ref_after - 1L) |>
+  mutate(
+    delta_ref = +57.5/1000,
+    ref_ratio = 0.5 * (ref_before_ratio + ref_after_ratio),
+    ref_ratio_sem = 0.5 * sqrt(ref_before_ratio_sem^2 + ref_after_ratio_sem^2),
+    delta = (ratio/ref_ratio * (delta_ref + 1) - 1) * 1000,
+    delta_sem = (delta + 1000) * sqrt( (ratio_sem/ratio)^2 + (ref_ratio_sem/ref_ratio)^2 )
+  )
+deltas |> select(injection, ref_before, ref_after, delta, delta_sem) |> 
+  knitr::kable(digits = 2)
+```
+
+
+# Figure 20 panel a (EIC trace)
+
+```{r}
+# base plot
+base_plot <- 
+  ggplot() |>
+  orbi_add_blocks_to_plot(data_only = TRUE, fill_colors = "gray80") +
+  aes(time.min, intensity, color = sample_name) +
+  geom_line() +
+  # set scales
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_color_brewer(palette = "Dark2") +
+  facet_grid(. ~ injection, scales = "free_x", space = "free_x") +
+  # theme definitions
+  theme_bw() +
+  theme(
+    text = element_text(size = 16),
+    strip.background = element_blank(),
+    panel.grid = element_blank(),
+    panel.spacing = unit(0, "npc"),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  labs(color = NULL, x = NULL)
+
+# plot EIC of the M0 ion
+fig_a <- base_plot %+%
+  filter(flow_injections, isotopocule == "M0") %+%
+  aes(y = intensity) +
+  scale_y_continuous(
+    trans = scales::pseudo_log_trans(),
+    breaks = 10^(6:10), labels = scales::label_log()
+  ) +
+  coord_cartesian(ylim = c(3.1e7, 1.2e9)) +
+  labs(y = "EIC nitrate [arb. units]")
+fig_a
+```
+
+# Figure 20 panel b (ratio trace)
+
+```{r}
+# plot ratio of 18O/M0
+fig_b <- 
+  base_plot %+% 
+  flow_injections_ratios %+% 
+  aes(y = ratio)
+fig_b
+```
+
+# Figure 20 panel c (ratios)
+
+```{r}
+fig_c <- 
+  flow_injections_summary |>
+  filter(data_type == "data") |>
+  # plot
+  ggplot() +
+  aes(
+    x = injection,
+    y = ratio, ymin = ratio - ratio_sem, ymax = ratio + ratio_sem,
+    color = sample_name, shape = sample_name
+  ) +
+  geom_pointrange() +
+  scale_color_brewer(palette = "Dark2") +
+  scale_shape_manual(values = c(21:25)) +
+  scale_y_continuous(breaks = scales::pretty_breaks(5)) +
+  scale_x_continuous(
+    breaks = 0:20, 
+    labels = function(x) { x[x %%2 > 0] <- ""; x }
+  ) +
+  # theme definitions
+  theme_bw() +
+  theme(
+    text = element_text(size = 16),
+    panel.grid = element_blank(),
+    legend.position = c(0.8, 0.5),
+    legend.background = element_rect(fill = "gray90", color = "black"),
+    legend.key = element_blank()
+  ) +
+  # labels
+  labs(
+    y = expression("ratio ("^18*O/M0*")"), 
+    color = "sample", shape = "sample"
+  )
+fig_c
+```
+
+# Figure 20 panel d (delta values)
+
+```{r}
+#| message: false
+#| warning: false
+fig_d <- fig_c %+% mutate(deltas, sample_name = "USGS32") %+%
+  aes(y = delta, ymin = delta - delta_sem, ymax = delta + delta_sem) +
+  scale_y_continuous(breaks = 25:35, labels = function(x) paste0(x, "\U2030")) +
+  labs(
+    y = expression(delta^18*O~"(USGS32 vs. VSMOW)"), 
+  )
+fig_d
+```
+
+
+# Figure 20 combined
+
+```{r}
+#| label: fig-20-nitrate
+#| fig-cap: nitrate measurements
+#| warning: false
+#| fig-width: 10
+#| fig-height: 10
+fig_cd <- 
+  plot_grid(
+    fig_c, 
+    fig_d + theme(legend.position = "none"), 
+    align = "h", axis = "tb", nrow = 1
+  )
+
+fig_ab <-
+  plot_grid(
+    fig_a + theme(legend.position = "none"), 
+    fig_b + theme(legend.position = "none"), 
+    align = "v", axis = "lr", ncol = 1
+  )
+    
+plot_grid(fig_ab, fig_cd, ncol = 1, rel_heights = c(2, 1))
+```
+
+
+# References
