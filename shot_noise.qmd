@@ -103,7 +103,7 @@ plot_grid(
 ## Figure 16: TFA shotnoise at differen TI
 
 ```{r}
-#| label: fig-15-shotnoise-tfa-ITs
+#| label: fig-16-shotnoise-tfa-ITs
 #| fig-cap: Shot noise at different ITs.
 #| fig-width: 10
 #| fig-height: 5.5
@@ -127,7 +127,7 @@ shot_noise_tfa |>
 ## Figure 17: TFA shotnoise at resolutions
 
 ```{r}
-#| label: fig-15-shotnoise-tfa-resolution
+#| label: fig-17-shotnoise-tfa-resolution
 #| fig-cap: Shot noise at different resolutions.
 #| fig-width: 10
 #| fig-height: 5.5

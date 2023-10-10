@@ -70,6 +70,8 @@ flow_injections <-
   ) |>
   # focus on injections with signal
   filter(injection > 1, injection < 15) |>
+  # flag low intensity peaks
+  orbi_flag_outliers(intensity_window = c(20, 100)) |>
   # define data block
   orbi_define_block(start_time.min = 0.5, end_time.min = 6.5)
 ```
@@ -90,6 +92,8 @@ flow_injections_ratios <-
 # ratio summary
 flow_injections_summary <- 
   flow_injections_w_basepeak |>
+  # remove low intensity outliers
+  
   orbi_summarize_results(ratio_method = "sum")
 
 # delta ratios
@@ -132,8 +136,7 @@ deltas |> select(injection, ref_before, ref_after, delta, delta_sem) |>
 ```{r}
 # base plot
 base_plot <- 
-  ggplot() |>
-  orbi_add_blocks_to_plot(data_only = TRUE, fill_colors = "gray80") +
+  ggplot() +
   aes(time.min, intensity, color = sample_name) +
   geom_line() +
   # set scales
@@ -154,7 +157,7 @@ base_plot <-
 
 # plot EIC of the M0 ion
 fig_a <- base_plot %+%
-  filter(flow_injections, isotopocule == "M0") %+%
+  filter(flow_injections, isotopocule == "M0", is_outlier) %+%
   aes(y = intensity) +
   scale_y_continuous(
     trans = scales::pseudo_log_trans(),
