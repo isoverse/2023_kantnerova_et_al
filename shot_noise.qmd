@@ -9,8 +9,8 @@ fig-width: 8
 fig-height: 6
 df-print: tibble
 embed-resources: true
-format: 
-  html: 
+format:
+  html:
     code-tools: true
     code-fold: false
     code-summary: "Show the code"
@@ -21,7 +21,7 @@ crossref:
   tbl-prefix: Table
   ref-hyperlink: true
 editor: source
-editor_options: 
+editor_options:
   chunk_output_type: console
 ---
 
@@ -71,36 +71,36 @@ shot_noise_tfa <-
   orbi_export_data_to_excel("output/shot_noise_tfa.xlsx")
 ```
 
-## Figure 15: TFA shotnoise vs counts/time
+## Figure 10: TFA shotnoise vs counts/time
 
 ```{r}
-#| label: fig-15-shotnoise-tfa
+#| label: fig-10-shotnoise-tfa
 #| fig-cap: Shot noise vs counts and vs time.
 #| fig-width: 10
 #| fig-height: 5
 #| warning: false
 
 # individual plots
-tfa_vs_ions <- 
+tfa_vs_ions <-
   shot_noise_tfa |>
   orbi_filter_isox(filename = "TFA_M0_1uscan_15kRes") |>
   orbi_plot_shot_noise(x = "n_effective_ions")
-tfa_vs_time <- 
+tfa_vs_time <-
   shot_noise_tfa |>
   orbi_filter_isox(filename = "TFA_M0_1uscan_15kRes") |>
   orbi_plot_shot_noise(permil_target = 1)
 
 # combine
 plot_grid(
-  tfa_vs_ions + facet_wrap(~"vs counts") + 
-    theme(legend.position = c(0.85, 0.74)), 
-  tfa_vs_time + facet_wrap(~"vs time") + 
+  tfa_vs_ions + facet_wrap(~"vs counts") +
+    theme(legend.position = c(0.85, 0.74)),
+  tfa_vs_time + facet_wrap(~"vs time") +
     theme(legend.position = "none"),
   align = "h", nrow = 1, axis = "tb"
 )
 ```
 
-## Figure 16: TFA shotnoise at differen TI
+## Extended Data Figure 6: TFA shotnoise at different IT
 
 ```{r}
 #| label: fig-16-shotnoise-tfa-ITs
@@ -124,7 +124,7 @@ shot_noise_tfa |>
   theme(legend.position = c(0.41, 0.77))
 ```
 
-## Figure 17: TFA shotnoise at resolutions
+## Extended Data Figure 7: TFA shotnoise at different resolutions
 
 ```{r}
 #| label: fig-17-shotnoise-tfa-resolution
@@ -173,15 +173,15 @@ shot_noise_aas <-
 shot_noise_aas |>
   arrange(compound, isotopocule, scan.no) |>
   head(10) |>
-  select(compound, scan.no, time.min, isotopocule, 
+  select(compound, scan.no, time.min, isotopocule,
          ratio, ratio_rel_se.permil, shot_noise.permil) |>
   knitr::kable()
 ```
 
-## Figure 18: Amino Acids Shot Noise
+## Extended Data Figure 8: Amino Acids Shot Noise
 
 ```{r}
-#| label: fig-18-shotnoise-mrfa
+#| label: ext-data-fig-8-shotnoise-mrfa
 #| fig-cap: amino acids shotnoise
 #| warning: false
 #| fig-width: 8
