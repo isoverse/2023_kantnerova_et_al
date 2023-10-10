@@ -48,7 +48,7 @@ knitr::opts_chunk$set(
   collapse = TRUE, comment = "#>",
   dev = c("png", "pdf"), fig.keep = "all",
   dev.args = list(pdf = list(encoding = "WinAnsi", useDingbats = FALSE)),
-  fig.path = sprintf("plots/%s_", gsub("\\.qmd", "", knitr::current_input()))
+  fig.path = sprintf("plots/%s_", gsub("\\.rmarkdown", "", knitr::current_input()))
 )
 ```
 
@@ -106,7 +106,7 @@ p_top <-
   scale_x_continuous(breaks = c(5, 10), expand = c(0, 0)) +
   expand_limits(x = 0) + 
   # labels 
-  labs(x = "time [min]", y = "EIC [arb. unit]") +
+  labs(x = "time [min]", y = "EIC [arb. units]") +
   # theme
   theme_bw() +
   theme(

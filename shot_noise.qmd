@@ -47,7 +47,7 @@ knitr::opts_chunk$set(
   collapse = TRUE, comment = "#>",
   dev = c("png", "pdf"), fig.keep = "all",
   dev.args = list(pdf = list(encoding = "WinAnsi", useDingbats = FALSE)),
-  fig.path = sprintf("plots/%s_", gsub("\\.qmd", "", knitr::current_input()))
+  fig.path = sprintf("plots/%s_", gsub("\\.rmarkdown", "", knitr::current_input()))
 )
 ```
 
