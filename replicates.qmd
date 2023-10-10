@@ -87,9 +87,11 @@ ratios <- data |>
   orbi_summarize_results(ratio_method = "sum") 
 ```
 
-# Figure 19 top panel
+# Figure 11 top panel
 
 ```{r}
+#| label: fig-11-replicates-top
+
 p_top <- 
   data |>
   filter(isotopocule == "M0") |>
@@ -101,12 +103,12 @@ p_top <-
   # scales
   scale_y_log10(
     breaks = c(5e6, 1e7, 2e7), 
-    labels = expression(5%*%10^6, 1%*%10^7, 2%*%10^7)) +
+    labels = expression(5 %*% 10^6, 1%*%10^7, 2%*%10^7)) +
   scale_color_brewer(palette = "Dark2") +
   scale_x_continuous(breaks = c(5, 10), expand = c(0, 0)) +
   expand_limits(x = 0) + 
   # labels 
-  labs(x = "time [min]", y = "EIC [arb. units]") +
+  labs(x = "time / min", y = "EIC / arb. unit") +
   # theme
   theme_bw() +
   theme(
@@ -117,9 +119,11 @@ p_top <-
 p_top
 ```
 
-# Figure 19 bottom panel
+# Figure 11 bottom panel
 
 ```{r}
+#| label: fig-11-replicates-bottom
+
 p_bottom <- 
   ratios |>
   ggplot() +
@@ -169,10 +173,10 @@ p_bottom <-
 p_bottom
 ```
 
-# Figure 19 combined
+# Figure 11 combined
 
 ```{r}
-#| label: fig-19-replicates
+#| label: fig-11-replicates
 #| fig-cap: amino acids replicates
 #| warning: false
 #| fig-width: 8

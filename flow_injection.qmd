@@ -131,9 +131,11 @@ deltas |> select(injection, ref_before, ref_after, delta, delta_sem) |>
 ```
 
 
-# Figure 20 panel a (EIC trace)
+# Figure 12 panel a (EIC trace)
 
 ```{r}
+#| label: fig-12-nitrate-a
+
 # base plot
 base_plot <- 
   ggplot() +
@@ -164,13 +166,15 @@ fig_a <- base_plot %+%
     breaks = 10^(6:10), labels = scales::label_log()
   ) +
   coord_cartesian(ylim = c(3.1e7, 1.2e9)) +
-  labs(y = "EIC nitrate [arb. units]")
+  labs(y = "EIC nitrate / arb. unit")
 fig_a
 ```
 
-# Figure 20 panel b (ratio trace)
+# Figure 12 panel b (ratio trace)
 
 ```{r}
+#| label: fig-12-nitrate-b
+
 # plot ratio of 18O/M0
 fig_b <- 
   base_plot %+% 
@@ -179,9 +183,11 @@ fig_b <-
 fig_b
 ```
 
-# Figure 20 panel c (ratios)
+# Figure 12 panel c (ratios)
 
 ```{r}
+#| label: fig-12-nitrate-c
+
 fig_c <- 
   flow_injections_summary |>
   filter(data_type == "data") |>
@@ -217,9 +223,10 @@ fig_c <-
 fig_c
 ```
 
-# Figure 20 panel d (delta values)
+# Figure 12 panel d (delta values)
 
 ```{r}
+#| label: fig-12-nitrate-d
 #| message: false
 #| warning: false
 fig_d <- fig_c %+% mutate(deltas, sample_name = "USGS32") %+%
@@ -232,10 +239,10 @@ fig_d
 ```
 
 
-# Figure 20 combined
+# Figure 12 combined
 
 ```{r}
-#| label: fig-20-nitrate
+#| label: fig-12-nitrate
 #| fig-cap: nitrate measurements
 #| warning: false
 #| fig-width: 10

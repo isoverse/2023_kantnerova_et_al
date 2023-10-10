@@ -103,7 +103,7 @@ plot_grid(
 ## Extended Data Figure 6: TFA shotnoise at different IT
 
 ```{r}
-#| label: fig-16-shotnoise-tfa-ITs
+#| label: fig-ext-data-6-shotnoise-tfa-ITs
 #| fig-cap: Shot noise at different ITs.
 #| fig-width: 10
 #| fig-height: 5.5
@@ -127,7 +127,7 @@ shot_noise_tfa |>
 ## Extended Data Figure 7: TFA shotnoise at different resolutions
 
 ```{r}
-#| label: fig-17-shotnoise-tfa-resolution
+#| label: fig-ext-data-7-shotnoise-tfa-resolution
 #| fig-cap: Shot noise at different resolutions.
 #| fig-width: 10
 #| fig-height: 5.5
@@ -181,7 +181,7 @@ shot_noise_aas |>
 ## Extended Data Figure 8: Amino Acids Shot Noise
 
 ```{r}
-#| label: ext-data-fig-8-shotnoise-mrfa
+#| label: fig-ext-data-8-shotnoise-mrfa
 #| fig-cap: amino acids shotnoise
 #| warning: false
 #| fig-width: 8
