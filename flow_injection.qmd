@@ -71,7 +71,7 @@ flow_injections <-
   # focus on injections with signal
   filter(injection > 1, injection < 15) |>
   # flag low intensity peaks
-  orbi_flag_outliers(intensity_window = c(20, 100)) |>
+  orbi_flag_outliers(agc_window = c(20, 100)) |>
   # define data block
   orbi_define_block(start_time.min = 0.5, end_time.min = 6.5)
 ```
