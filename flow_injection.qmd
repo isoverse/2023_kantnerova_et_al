@@ -60,8 +60,6 @@ flow_injections <-
   orbi_find_isox() |>
   orbi_read_isox() |>
   orbi_simplify_isox(add = "intensity") |>
-  # focus on the data of interest (18O and M0)
-  orbi_filter_isox(isotopocules = c("M0", "18O")) |>
   # get injection number from end of filename
   mutate(
     injection = filename |> str_extract("\\d+$") |> as.integer(),
@@ -70,13 +68,15 @@ flow_injections <-
   ) |>
   # focus on injections with signal
   filter(injection > 1, injection < 15) |>
-  # flag low intensity peaks
-  orbi_flag_outliers(agc_window = c(20, 100)) |>
+  # flag extreme TICxIT values
+  orbi_flag_outliers(agc_window = c(5, 95)) |>
   # define data block
   orbi_define_block(start_time.min = 0.5, end_time.min = 6.5)
 ```
 
 # Calculations
+
+## Ratios
 
 ```{r}
 # with basepeak
@@ -92,8 +92,8 @@ flow_injections_ratios <-
 # ratio summary
 flow_injections_summary <- 
   flow_injections_w_basepeak |>
-  # remove low intensity outliers
-  
+  # filter out the outliers flagged earlier
+  orbi_filter_flagged_data() |>
   orbi_summarize_results(ratio_method = "sum")
 
 # delta ratios
@@ -101,33 +101,112 @@ delta_ratios <-
   flow_injections_summary |>
   filter(data_type == "data") |>
   mutate(is_ref = sample_name == "USGS35") |>
-  select("is_ref", "injection", "ratio", "ratio_sem")
+  select(is_ref, injection, isotopocule, basepeak, ratio, ratio_sem)
+```
+
+## Deltas
+
+```{r}
+# known ratios vs Air/VSMOWM
+known_ratios <- tibble(
+  isotopocule = c("15N", "17O", "18O"),
+  reference = c("Air-N2", "VSMOW", "VSMOW"),
+  ratio_known = c(0.003676, 0.001140, 0.006016)
+)
+delta_USGS35 <- tibble(
+  isotopocule = c("15N", "17O", "18O"),
+  delta_known = c(+2.7, +50.35, +57.5)
+)
+delta_USGS32 <- tibble(
+  isotopocule = c("15N", "17O", "18O"),
+  delta_known = c(+180.0, +13.2, +25.7)
+)
 
 # calculate deltas by bracketing
 deltas <- 
   delta_ratios |>
+  # bracketing
   filter(!is_ref) |>
-  cross_join(
+  left_join(
     delta_ratios |> 
       filter(is_ref) |> 
-      select("ref_before" = "injection", "ref_before_ratio" = "ratio", 
-             "ref_before_ratio_sem" = "ratio_sem")) |>
+      select(
+        "isotopocule", "ref_before" = "injection", 
+        "ref_before_ratio" = "ratio", 
+        "ref_before_ratio_sem" = "ratio_sem"),
+    by = "isotopocule",
+    relationship = "many-to-many") |>
   filter(injection == ref_before + 1L) |>
-  cross_join(
+  left_join(
     delta_ratios |> 
       filter(is_ref) |> 
-      select("ref_after" = "injection", "ref_after_ratio" = "ratio", 
-             "ref_after_ratio_sem" = "ratio_sem")) |>
+      select(
+        "isotopocule", "ref_after" = "injection", 
+        "ref_after_ratio" = "ratio", 
+        "ref_after_ratio_sem" = "ratio_sem"),
+    by = "isotopocule",
+    relationship = "many-to-many") |>
   filter(injection == ref_after - 1L) |>
+  mutate(sample_name = "USGS32") |>
+  # delta calculations
+  left_join(rename(delta_USGS35, delta_ref = delta_known), by = "isotopocule") |>
   mutate(
-    delta_ref = +57.5/1000,
+    # average the bracketing standard
     ref_ratio = 0.5 * (ref_before_ratio + ref_after_ratio),
     ref_ratio_sem = 0.5 * sqrt(ref_before_ratio_sem^2 + ref_after_ratio_sem^2),
-    delta = (ratio/ref_ratio * (delta_ref + 1) - 1) * 1000,
-    delta_sem = (delta + 1000) * sqrt( (ratio_sem/ratio)^2 + (ref_ratio_sem/ref_ratio)^2 )
-  )
-deltas |> select(injection, ref_before, ref_after, delta, delta_sem) |> 
-  knitr::kable(digits = 2)
+    # calculate deltas
+    delta = ratio/ref_ratio * (delta_ref + 1000) - 1000,
+    delta_sem = (delta + 1000) * sqrt( (ratio_sem/ratio)^2 + (ref_ratio_sem/ref_ratio)^2)
+  ) |>
+  select(-is_ref) |>
+  arrange(isotopocule, injection)
+deltas |> orbi_export_data_to_excel("output/nitrate_data_all.xlsx")
+
+# deltas summary
+deltas_summary <- 
+  deltas |>
+  left_join(known_ratios, by = "isotopocule") |>
+  mutate(ratio_corr = (delta/1000 + 1) * ratio_known) |>
+  group_by(sample_name, isotopocule) |>
+  summarize(
+    isotopocule_ratio = sprintf("%s/%s", isotopocule[1], basepeak[1]),
+    n = n(),
+    ratio_raw_mean = mean(ratio),
+    ratio_raw_sdev_rel = sd(ratio) / ratio_raw_mean,
+    ratio_corrected_mean = mean(ratio_corr),
+    ratio_corrected_sdev_rel = sd(ratio_corr) / ratio_corrected_mean,
+    delta_mean = mean(delta),
+    delta_sdev = sd(delta),
+    .groups = "drop"
+  ) |>
+  # add expected values
+  left_join(rename(delta_USGS32, delta_expected = delta_known), by = "isotopocule") |>
+  left_join(rename(known_ratios, reference_ratio = ratio_known), by = "isotopocule") |>
+  mutate(ratio_expected = (delta_expected/1000 + 1) * reference_ratio) |>
+  select(-isotopocule)
+```
+
+# Table 2
+
+```{r}
+deltas_summary |>
+  select(
+    sample_name, isotopocule_ratio, ratio_expected, n,
+    starts_with("ratio_raw"), starts_with("ratio_corrected")
+  ) |>
+  orbi_export_data_to_excel("output/table2_nitrate_ratios.xlsx")
+```
+
+
+# Table 3
+
+```{r}
+deltas_summary |>
+  select(
+    isotopocule_ratio, reference, reference_ratio, 
+    ratio_corrected_mean, delta_expected, n, delta_mean, delta_sdev
+  ) |>
+  orbi_export_data_to_excel("output/table3_nitrate_ratios.xlsx")
 ```
 
 
@@ -159,7 +238,7 @@ base_plot <-
 
 # plot EIC of the M0 ion
 fig_a <- base_plot %+%
-  filter(flow_injections, isotopocule == "M0", is_outlier) %+%
+  filter(flow_injections, isotopocule == "M0") %+%
   aes(y = intensity) +
   scale_y_continuous(
     trans = scales::pseudo_log_trans(),
@@ -178,7 +257,7 @@ fig_a
 # plot ratio of 18O/M0
 fig_b <- 
   base_plot %+% 
-  flow_injections_ratios %+% 
+  filter(flow_injections_ratios, isotopocule == "18O") %+% 
   aes(y = ratio)
 fig_b
 ```
@@ -190,7 +269,7 @@ fig_b
 
 fig_c <- 
   flow_injections_summary |>
-  filter(data_type == "data") |>
+  filter(data_type == "data", isotopocule == "18O") |>
   # plot
   ggplot() +
   aes(
@@ -229,7 +308,8 @@ fig_c
 #| label: fig-12-nitrate-d
 #| message: false
 #| warning: false
-fig_d <- fig_c %+% mutate(deltas, sample_name = "USGS32") %+%
+fig_d <- fig_c %+%
+  filter(deltas, isotopocule == "18O") %+%
   aes(y = delta, ymin = delta - delta_sem, ymax = delta + delta_sem) +
   scale_y_continuous(breaks = 25:35, labels = function(x) paste0(x, "\U2030")) +
   labs(
