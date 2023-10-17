@@ -206,7 +206,7 @@ deltas_summary |>
     isotopocule_ratio, reference, reference_ratio, 
     ratio_corrected_mean, delta_expected, n, delta_mean, delta_sdev
   ) |>
-  orbi_export_data_to_excel("output/table3_nitrate_ratios.xlsx")
+  orbi_export_data_to_excel("output/table3_nitrate_deltas.xlsx")
 ```
 
 
