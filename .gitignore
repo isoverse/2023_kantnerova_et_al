@@ -14,7 +14,6 @@
 *.csv
 *cache/**/*
 output/**/*
-plots/**/*
 
 # explicitly allow all files in data (by default)
 !data/**/*

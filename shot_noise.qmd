@@ -106,7 +106,7 @@ plot_grid(
 #| label: fig-ext-data-6-shotnoise-tfa-ITs
 #| fig-cap: Shot noise at different ITs.
 #| fig-width: 10
-#| fig-height: 5.5
+#| fig-height: 5
 #| warning: false
 shot_noise_tfa |>
   orbi_filter_isox(filename = c("TFA_1E4_AGC", "TFA_M0_1uscan_15kRes")) |>
@@ -130,7 +130,7 @@ shot_noise_tfa |>
 #| label: fig-ext-data-7-shotnoise-tfa-resolution
 #| fig-cap: Shot noise at different resolutions.
 #| fig-width: 10
-#| fig-height: 5.5
+#| fig-height: 5
 #| warning: false
 shot_noise_tfa |>
   orbi_filter_isox(filename = c("TFA_M0_1uscan_120kRes", "TFA_M0_1uscan_15kRes")) |>
@@ -185,7 +185,7 @@ shot_noise_aas |>
 #| fig-cap: amino acids shotnoise
 #| warning: false
 #| fig-width: 8
-#| fig-height: 9
+#| fig-height: 8
 shot_noise_aas |>
   filter(compound == "Met_imm" | isotopocule != "2H") |>
   # change panel titles
