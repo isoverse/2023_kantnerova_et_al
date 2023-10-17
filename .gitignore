@@ -3,9 +3,7 @@
 # exclude all output files and folders by default
 *.rds
 *.rda
-*.pdf
 *.html
-*.png
 *.jpeg
 *.jpg
 *.pptx
