@@ -1,0 +1,352 @@
+---
+title: "Flow injection"
+author: "Kantnerova et al. (2023)"
+date: "`r format(Sys.Date(), '%d %b %Y')`"
+number-sections: false
+toc: true
+toc-depth: 2
+fig-width: 8
+fig-height: 6
+df-print: tibble
+embed-resources: true
+format: 
+  html: 
+    code-tools: true
+    code-fold: false
+    code-summary: "Show the code"
+    toc-float: true
+bibliography: references.bib
+crossref:
+  fig-prefix: Fig.
+  tbl-prefix: Table
+  ref-hyperlink: true
+editor: source
+editor_options: 
+  chunk_output_type: console
+---
+
+# Setup
+
+Using `r R.version.string` , @R, tidyverse version `r packageVersion("tidyverse")`, @tidyverse, and isoorbi version `r packageVersion("isoorbi")`.
+
+```{r}
+#| label: setup
+#| message: false
+
+# load packages
+# libraries
+library(isoorbi) # load isoorbi R package
+library(dplyr) # for mutating data frames
+library(stringr) # for extarcting text information
+library(ggplot2) # for data visualization
+library(cowplot) # arrange multipanel plots
+```
+
+```{r, include=FALSE}
+# global knitting options for code rendering
+knitr::opts_chunk$set(
+  collapse = TRUE, comment = "#>",
+  dev = c("png", "pdf"), fig.keep = "all",
+  dev.args = list(pdf = list(encoding = "WinAnsi", useDingbats = FALSE)),
+  fig.path = sprintf("plots/%s_", gsub("\\.rmarkdown", "", knitr::current_input()))
+)
+```
+
+# Data
+
+```{r}
+flow_injections <- 
+  "data" |>
+  orbi_find_isox() |>
+  orbi_read_isox() |>
+  orbi_simplify_isox(add = "intensity") |>
+  # get injection number from end of filename
+  mutate(
+    injection = filename |> str_extract("\\d+$") |> as.integer(),
+    sample_name = ifelse(injection %% 2 == 0, "USGS35", "USGS32"),
+    .after = 1L
+  ) |>
+  # focus on injections with signal
+  filter(injection > 1, injection < 15) |>
+  # define data block
+  orbi_define_block(start_time.min = 0.5, end_time.min = 6.5) |>
+  orbi_filter_flagged_data()|>
+  # flag extreme TICxIT values
+  orbi_flag_outliers(agc_window = c(5, 95)) 
+
+```
+
+# Calculations
+
+## Ratios
+
+```{r}
+# with basepeak
+flow_injections_w_basepeak <- 
+  flow_injections |>
+  orbi_define_basepeak("M0")
+
+# ratios
+flow_injections_ratios <- 
+  flow_injections_w_basepeak |>
+  orbi_calculate_ratios()
+
+# ratio summary
+flow_injections_summary <- 
+  flow_injections_w_basepeak |>
+  # filter out the outliers flagged earlier
+  orbi_filter_flagged_data() |>
+  orbi_summarize_results(ratio_method = "sum") |>
+  orbi_export_data_to_excel("output/Procedure_2_new.xlsx")
+
+
+# delta ratios
+delta_ratios <-
+  flow_injections_summary |>
+  filter(data_type == "data") |>
+  mutate(is_ref = sample_name == "USGS35") |>
+  select(is_ref, injection, isotopocule, basepeak, ratio, ratio_sem)
+```
+
+## Deltas
+
+```{r}
+# known ratios vs Air/VSMOWM
+known_ratios <- tibble(
+  isotopocule = c("15N", "17O", "18O"),
+  reference = c("Air-N2", "VSMOW", "VSMOW"),
+  ratio_known = c(0.003676, 0.001140, 0.006016)
+)
+delta_USGS35 <- tibble(
+  isotopocule = c("15N", "17O", "18O"),
+  delta_known = c(+2.7, +50.35, +57.5)
+)
+delta_USGS32 <- tibble(
+  isotopocule = c("15N", "17O", "18O"),
+  delta_known = c(+180.0, +13.2, +25.7)
+)
+
+# calculate deltas by bracketing
+deltas <- 
+  delta_ratios |>
+  # bracketing
+  filter(!is_ref) |>
+  left_join(
+    delta_ratios |> 
+      filter(is_ref) |> 
+      select(
+        "isotopocule", "ref_before" = "injection", 
+        "ref_before_ratio" = "ratio", 
+        "ref_before_ratio_sem" = "ratio_sem"),
+    by = "isotopocule",
+    relationship = "many-to-many") |>
+  filter(injection == ref_before + 1L) |>
+  left_join(
+    delta_ratios |> 
+      filter(is_ref) |> 
+      select(
+        "isotopocule", "ref_after" = "injection", 
+        "ref_after_ratio" = "ratio", 
+        "ref_after_ratio_sem" = "ratio_sem"),
+    by = "isotopocule",
+    relationship = "many-to-many") |>
+  filter(injection == ref_after - 1L) |>
+  mutate(sample_name = "USGS32") |>
+  # delta calculations
+  left_join(rename(delta_USGS35, delta_ref = delta_known), by = "isotopocule") |>
+  mutate(
+    # average the bracketing standard
+    ref_ratio = 0.5 * (ref_before_ratio + ref_after_ratio),
+    ref_ratio_sem = 0.5 * sqrt(ref_before_ratio_sem^2 + ref_after_ratio_sem^2),
+    # calculate deltas
+    delta = ratio/ref_ratio * (delta_ref + 1000) - 1000,
+    delta_sem = (delta + 1000) * sqrt( (ratio_sem/ratio)^2 + (ref_ratio_sem/ref_ratio)^2)
+  ) |>
+  select(-is_ref) |>
+  arrange(isotopocule, injection)
+deltas |> orbi_export_data_to_excel("output/nitrate_data_all.xlsx")
+
+# deltas summary
+deltas_summary <- 
+  deltas |>
+  left_join(known_ratios, by = "isotopocule") |>
+  mutate(ratio_corr = (delta/1000 + 1) * ratio_known) |>
+  group_by(sample_name, isotopocule) |>
+  summarize(
+    isotopocule_ratio = sprintf("%s/%s", isotopocule[1], basepeak[1]),
+    n = n(),
+    ratio_raw_mean = mean(ratio),
+    ratio_raw_sdev_rel = sd(ratio) / ratio_raw_mean,
+    ratio_corrected_mean = mean(ratio_corr),
+    ratio_corrected_sdev_rel = sd(ratio_corr) / ratio_corrected_mean,
+    delta_mean = mean(delta),
+    delta_sdev = sd(delta),
+    .groups = "drop"
+  ) |>
+  # add expected values
+  left_join(rename(delta_USGS32, delta_expected = delta_known), by = "isotopocule") |>
+  left_join(rename(known_ratios, reference_ratio = ratio_known), by = "isotopocule") |>
+  mutate(ratio_expected = (delta_expected/1000 + 1) * reference_ratio) |>
+  select(-isotopocule)
+```
+
+# Table 2
+
+```{r}
+deltas_summary |>
+  select(
+    sample_name, isotopocule_ratio, ratio_expected, n,
+    starts_with("ratio_raw"), starts_with("ratio_corrected")
+  ) |>
+  orbi_export_data_to_excel("output/table2_nitrate_ratios.xlsx")
+```
+
+
+# Table 3
+
+```{r}
+deltas_summary |>
+  select(
+    isotopocule_ratio, reference, reference_ratio, 
+    ratio_corrected_mean, delta_expected, n, delta_mean, delta_sdev
+  ) |>
+  orbi_export_data_to_excel("output/table3_nitrate_deltas.xlsx")
+```
+
+
+# Figure 12 panel a (EIC trace)
+
+```{r}
+#| label: fig-12-nitrate-a
+
+# base plot
+base_plot <- 
+  ggplot() +
+  aes(time.min, intensity, color = sample_name) +
+  geom_line() +
+  # set scales
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_color_brewer(palette = "Dark2") +
+  facet_grid(. ~ injection, scales = "free_x", space = "free_x") +
+  # theme definitions
+  theme_bw() +
+  theme(
+    text = element_text(size = 16),
+    strip.background = element_blank(),
+    panel.grid = element_blank(),
+    panel.spacing = unit(0, "npc"),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  labs(color = NULL, x = NULL)
+
+# plot EIC of the M0 ion
+fig_a <- base_plot %+%
+  filter(flow_injections, isotopocule == "M0") %+%
+  aes(y = intensity) +
+  scale_y_continuous(
+    trans = scales::pseudo_log_trans(),
+    breaks = 10^(6:10), labels = scales::label_log()
+  ) +
+  coord_cartesian(ylim = c(3.1e7, 1.2e9)) +
+  labs(y = "EIC nitrate / arb. unit")
+fig_a
+```
+
+# Figure 12 panel b (ratio trace)
+
+```{r}
+#| label: fig-12-nitrate-b
+
+# plot ratio of 18O/M0
+fig_b <- 
+  base_plot %+% 
+  filter(flow_injections_ratios, isotopocule == "18O") %+% 
+  aes(y = ratio)
+fig_b
+```
+
+# Figure 12 panel c (ratios)
+
+```{r}
+#| label: fig-12-nitrate-c
+
+fig_c <- 
+  flow_injections_summary |>
+  filter(data_type == "data", isotopocule == "18O") |>
+  # plot
+  ggplot() +
+  aes(
+    x = injection,
+    y = ratio, ymin = ratio - ratio_sem, ymax = ratio + ratio_sem,
+    color = sample_name, shape = sample_name
+  ) +
+  geom_pointrange() +
+  scale_color_brewer(palette = "Dark2") +
+  scale_shape_manual(values = c(21:25)) +
+  scale_y_continuous(breaks = scales::pretty_breaks(5)) +
+  scale_x_continuous(
+    breaks = 0:20, 
+    labels = function(x) { x[x %%2 > 0] <- ""; x }
+  ) +
+  # theme definitions
+  theme_bw() +
+  theme(
+    text = element_text(size = 16),
+    panel.grid = element_blank(),
+    legend.position = c(0.8, 0.5),
+    legend.background = element_rect(fill = "gray90", color = "black"),
+    legend.key = element_blank()
+  ) +
+  # labels
+  labs(
+    y = expression("ratio ("^18*O/M0*")"), 
+    color = "sample", shape = "sample"
+  )
+fig_c
+```
+
+# Figure 12 panel d (delta values)
+
+```{r}
+#| label: fig-12-nitrate-d
+#| message: false
+#| warning: false
+fig_d <- fig_c %+%
+  filter(deltas, isotopocule == "18O") %+%
+  aes(y = delta, ymin = delta - delta_sem, ymax = delta + delta_sem) +
+  scale_y_continuous(breaks = 25:35, labels = function(x) paste0(x, "\U2030")) +
+  labs(
+    y = expression(delta^18*O~"(USGS32 vs. VSMOW)"), 
+  )
+fig_d
+```
+
+
+# Figure 12 combined
+
+```{r}
+#| label: fig-12-nitrate
+#| fig-cap: nitrate measurements
+#| warning: false
+#| fig-width: 10
+#| fig-height: 10
+fig_cd <- 
+  plot_grid(
+    fig_c, 
+    fig_d + theme(legend.position = "none"), 
+    align = "h", axis = "tb", nrow = 1
+  )
+
+fig_ab <-
+  plot_grid(
+    fig_a + theme(legend.position = "none"), 
+    fig_b + theme(legend.position = "none"), 
+    align = "v", axis = "lr", ncol = 1
+  )
+    
+plot_grid(fig_ab, fig_cd, ncol = 1, rel_heights = c(2, 1))
+```
+
+
+# References
