@@ -96,8 +96,7 @@ flow_injections_summary <-
   flow_injections_w_basepeak |>
   # filter out the outliers flagged earlier
   orbi_filter_flagged_data() |>
-  orbi_summarize_results(ratio_method = "sum") |>
-  orbi_export_data_to_excel("output/Procedure_2_new.xlsx")
+  orbi_summarize_results(ratio_method = "sum") 
 
 
 # delta ratios
