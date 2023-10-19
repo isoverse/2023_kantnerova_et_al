@@ -59,13 +59,15 @@ flow_injections <-
   "data/nitrate" |>
   orbi_find_isox() |>
   orbi_read_isox() |>
-  orbi_simplify_isox(add = "intensity") |>
-  # get injection number from end of filename
+  # get injection number, and sample name from filename and add tuning to filename
   mutate(
+    tuning = filepath |> dirname() |> basename() |> str_extract("bad|optimal"),
     injection = filename |> str_extract("\\d+$") |> as.integer(),
     sample_name = ifelse(injection %% 2 == 0, "USGS35", "USGS32"),
+    filename = paste(tuning, filename),
     .after = 1L
   ) |>
+  orbi_simplify_isox(add = c("intensity", "tuning", "injection", "sample_name")) |>
   # focus on injections with signal
   filter(injection > 1, injection < 15) |>
   # define data block
@@ -94,14 +96,11 @@ flow_injections_summary <-
   flow_injections_w_basepeak |>
   # filter out the outliers flagged earlier
   orbi_filter_flagged_data() |>
-  orbi_summarize_results(ratio_method = "sum")
-
-# delta ratios
-delta_ratios <-
-  flow_injections_summary |>
-  filter(data_type == "data") |>
-  mutate(is_ref = sample_name == "USGS35") |>
-  select(is_ref, injection, isotopocule, basepeak, ratio, ratio_sem)
+  orbi_summarize_results(ratio_method = "sum") |>
+  mutate(
+    tuning = filename |> str_extract("bad|optimal"),
+    is_ref = sample_name == "USGS35"
+  )
 ```
 
 ## Deltas
@@ -122,6 +121,12 @@ delta_USGS32 <- tibble(
   delta_known = c(+180.0, +13.2, +25.7)
 )
 
+# delta ratios
+delta_ratios <-
+  flow_injections_summary |>
+  filter(data_type == "data") |>
+  select(tuning, is_ref, injection, isotopocule, basepeak, ratio, ratio_sem)
+
 # calculate deltas by bracketing
 deltas <- 
   delta_ratios |>
@@ -130,21 +135,21 @@ deltas <-
   left_join(
     delta_ratios |> 
       filter(is_ref) |> 
-      select(
-        "isotopocule", "ref_before" = "injection", 
-        "ref_before_ratio" = "ratio", 
-        "ref_before_ratio_sem" = "ratio_sem"),
-    by = "isotopocule",
+      rename(
+        ref_before = injection, ref_before_ratio = ratio, 
+        ref_before_ratio_sem = ratio_sem
+      ) |> select(-is_ref),
+    by = c("isotopocule", "tuning"),
     relationship = "many-to-many") |>
   filter(injection == ref_before + 1L) |>
   left_join(
     delta_ratios |> 
       filter(is_ref) |> 
-      select(
-        "isotopocule", "ref_after" = "injection", 
-        "ref_after_ratio" = "ratio", 
-        "ref_after_ratio_sem" = "ratio_sem"),
-    by = "isotopocule",
+      rename(
+        ref_after = injection, ref_after_ratio = ratio, 
+        ref_after_ratio_sem = ratio_sem
+      ) |> select(-is_ref),
+    by = c("isotopocule", "tuning"),
     relationship = "many-to-many") |>
   filter(injection == ref_after - 1L) |>
   mutate(sample_name = "USGS32") |>
@@ -167,7 +172,7 @@ deltas_summary <-
   deltas |>
   left_join(known_ratios, by = "isotopocule") |>
   mutate(ratio_corr = (delta/1000 + 1) * ratio_known) |>
-  group_by(sample_name, isotopocule) |>
+  group_by(tuning, sample_name, isotopocule) |>
   summarize(
     isotopocule_ratio = sprintf("%s/%s", isotopocule[1], basepeak[1]),
     n = n(),
@@ -190,6 +195,7 @@ deltas_summary <-
 
 ```{r}
 deltas_summary |>
+  filter(tuning == "optimal") |>
   select(
     sample_name, isotopocule_ratio, ratio_expected, n,
     starts_with("ratio_raw"), starts_with("ratio_corrected")
@@ -202,6 +208,7 @@ deltas_summary |>
 
 ```{r}
 deltas_summary |>
+  filter(tuning == "optimal") |>
   select(
     isotopocule_ratio, reference, reference_ratio, 
     ratio_corrected_mean, delta_expected, n, delta_mean, delta_sdev
@@ -209,6 +216,18 @@ deltas_summary |>
   orbi_export_data_to_excel("output/table3_nitrate_deltas.xlsx")
 ```
 
+
+# Table 4
+
+```{r}
+deltas_summary |>
+  filter(tuning == "bad") |>
+  select(
+    isotopocule_ratio, reference, reference_ratio, 
+    ratio_corrected_mean, delta_expected, n, delta_mean, delta_sdev
+  ) |>
+  orbi_export_data_to_excel("output/table4_nitrate_deltas_bad_tuning.xlsx")
+```
 
 # Figure 12 panel a (EIC trace)
 
@@ -238,7 +257,7 @@ base_plot <-
 
 # plot EIC of the M0 ion
 fig_a <- base_plot %+%
-  filter(flow_injections, isotopocule == "M0") %+%
+  filter(flow_injections, tuning == "bad", isotopocule == "M0") %+%
   aes(y = intensity) +
   scale_y_continuous(
     trans = scales::pseudo_log_trans(),
@@ -257,7 +276,7 @@ fig_a
 # plot ratio of 18O/M0
 fig_b <- 
   base_plot %+% 
-  filter(flow_injections_ratios, isotopocule == "18O") %+% 
+  filter(flow_injections_ratios, tuning == "bad", isotopocule == "18O") %+% 
   aes(y = ratio)
 fig_b
 ```
@@ -269,7 +288,7 @@ fig_b
 
 fig_c <- 
   flow_injections_summary |>
-  filter(data_type == "data", isotopocule == "18O") |>
+  filter(data_type == "data", tuning == "bad", isotopocule == "18O") |>
   # plot
   ggplot() +
   aes(
@@ -309,12 +328,11 @@ fig_c
 #| message: false
 #| warning: false
 fig_d <- fig_c %+%
-  filter(deltas, isotopocule == "18O") %+%
+  filter(deltas, tuning == "bad", isotopocule == "18O") %+%
   aes(y = delta, ymin = delta - delta_sem, ymax = delta + delta_sem) +
-  scale_y_continuous(breaks = 25:35, labels = function(x) paste0(x, "\U2030")) +
-  labs(
-    y = expression(delta^18*O~"(USGS32 vs. VSMOW)"), 
-  )
+  #scale_y_continuous(breaks = 25:35, labels = function(x) paste0(x, "\U2030")) +
+  scale_y_continuous(breaks = 25:35) +
+  labs(y = expression(delta^18*O~"(USGS32 vs. VSMOW) in permil"))
 fig_d
 ```
 
