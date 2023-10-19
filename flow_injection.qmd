@@ -68,10 +68,10 @@ flow_injections <-
   ) |>
   # focus on injections with signal
   filter(injection > 1, injection < 15) |>
-  # flag extreme TICxIT values
-  orbi_flag_outliers(agc_window = c(5, 95)) |>
   # define data block
-  orbi_define_block(start_time.min = 0.5, end_time.min = 6.5)
+  orbi_define_block(start_time.min = 0.5, end_time.min = 6.5) |>
+  # flag extreme TICxIT values
+  orbi_flag_outliers(agc_window = c(5, 95)) 
 ```
 
 # Calculations
