@@ -43,6 +43,7 @@ Thumbs.db
 .Rhistory
 .Rapp.history
 .RData
+.RDataTmp
 .Ruserdata
 .Rproj.user/
 .Rbuildignore
