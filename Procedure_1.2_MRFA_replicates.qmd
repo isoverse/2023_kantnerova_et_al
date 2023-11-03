@@ -1,5 +1,5 @@
 ---
-title: "Replicates"
+title: "MRFA Replicates"
 author: "Kantnerova et al. (2023)"
 date: "`r format(Sys.Date(), '%d %b %Y')`"
 number-sections: false
@@ -56,13 +56,13 @@ knitr::opts_chunk$set(
 ```{r}
 #| label: isotopocule data
 data <- 
-  "data" |>
+  "data/replicates" |>
   orbi_find_isox() |> # finds all .isox files in a folder
   orbi_read_isox() |> # reads the .isox files into a tibble data frame
   orbi_flag_satellite_peaks() |> # flags minor signals (e.g., satellite peaks) that were reported by IsoX
   orbi_flag_weak_isotopocules(min_percent = 30) |> # flags isotopocules that are not consistently detected in most scans
-  orbi_flag_outliers(agc_window = c(2, 98)) |> # flags outliers based on a TIC x IT criteria
-  orbi_filter_flagged_data() |> # filters out data that have been flagged using the previous functions
+  orbi_flag_outliers(agc_fold_cutoff = 1.05) |> # flags outliers based on a TIC x IT criteria
+  
   # pull out replicate from filename
   mutate(
     replicate = str_extract(filename, "Replicate_\\d") |> str_replace("_", " ")
@@ -82,41 +82,28 @@ data <-
 ratios <- data |>
   orbi_define_basepeak("M0") |> # sets one isotopocule in the data frame as the base peak (ratio denominator)
   orbi_filter_isox(isotopocules = "13C") |> # selects only a particular isotopocule, can be also used for compound or time range
-  group_by(replicate) |>
+  group_by(replicate) |> # group by replicate in addition to the default groupings
   orbi_summarize_results(ratio_method = "sum") # generates the results table
 
-ratios  |> orbi_export_data_to_excel("MRFA_data_replicates.xlsx") # exports the final dataset into an Excel file
+ratios |> orbi_export_data_to_excel("output/MRFA_data_replicates.xlsx") # exports the final dataset into an Excel file
 ```
 
 # Figure - top panel
 
 ```{r}
 #| label: fig-replicates-top
-
-p_top <- 
-  data |>
-  filter(isotopocule == "M0") |>
-  # plot setup
-  ggplot() +
-  aes(time.min, intensity, color = compound) + 
-  geom_line() +
-  facet_grid(. ~ replicate) +
-  # scales
-  scale_y_log10(
-    breaks = c(5e6, 1e7, 2e7), 
-    labels = expression(5 %*% 10^6, 1%*%10^7, 2%*%10^7)) +
-  scale_color_brewer(palette = "Dark2") +
-  scale_x_continuous(breaks = c(5, 10), expand = c(0, 0)) +
-  expand_limits(x = 0) + 
-  # labels 
+p_top <- data |>
+  orbi_plot_raw_data(
+    isotopocules = "M0",
+    x_breaks = c(5, 10),
+    y = intensity,
+    y_scale = "log",
+    color = compound,
+    show_outliers = FALSE
+  ) +
+  facet_wrap(~replicate, nrow = 1) +
   labs(x = "time / min", y = "EIC / arb. unit") +
-  # theme
-  theme_bw() +
-  theme(
-    text = element_text(size = 16),
-    panel.grid = element_blank(),
-    strip.background = element_blank()
-  )
+  theme(strip.text = element_text(size = 16))
 p_top
 ```
 
@@ -124,7 +111,6 @@ p_top
 
 ```{r}
 #| label: fig-replicates-bottom
-
 p_bottom <- 
   ratios |>
   ggplot() +
@@ -162,13 +148,10 @@ p_bottom <-
   labs(x = NULL, color = NULL, shape = NULL,
        y = expression("ratio ("^13*C/M0*")")) +
   # theme
-  theme_bw() +
+  orbi_default_theme() +
   theme(
-    text = element_text(size = 16),
-    panel.grid = element_blank(),
-    strip.background = element_blank(),
-    strip.text = element_blank(),
     axis.ticks.x = element_blank(),
+    strip.text = element_blank(),
     legend.position = "top"
   )
 p_bottom

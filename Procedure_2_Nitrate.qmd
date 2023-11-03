@@ -1,5 +1,5 @@
 ---
-title: "Flow injection"
+title: "Nitrate Flow Injection"
 author: "Kantnerova et al. (2023)"
 date: "`r format(Sys.Date(), '%d %b %Y')`"
 number-sections: false
@@ -49,6 +49,9 @@ knitr::opts_chunk$set(
   dev.args = list(pdf = list(encoding = "WinAnsi", useDingbats = FALSE)),
   fig.path = sprintf("plots/%s_", gsub("\\.rmarkdown", "", knitr::current_input()))
 )
+
+# FIXME: Fix this!
+
 # Load sample sequence (requires columns `File.Name` and `Sample.Name`, can also be written as `File Name` and `Sample Name` in .csv)
 df.sequence <- read.csv(file = file.path("data", "sequence.csv"),
                         header = TRUE,
@@ -59,8 +62,7 @@ df.sequence <- read.csv(file = file.path("data", "sequence.csv"),
 
 ```
 
-#Optional User Inputs
-
+# Optional User Inputs
 
 ```{r}
 #| label: user inputs
@@ -82,7 +84,6 @@ delta_Sample <- tibble(
   isotopocule = c("15N", "17O", "18O"),
   delta_known = c(+180.0, +13.2, +25.7)
 )
-
 ```
 
 # Data
@@ -90,7 +91,7 @@ delta_Sample <- tibble(
 ```{r}
 #| label: data
 flow_injections <- 
-  "data" |>
+  "data/nitrate" |>
   orbi_find_isox() |> # finds all .isox files in a folder
   orbi_read_isox() |> # reads the .isox files into a tibble data frame
   mutate(
@@ -101,7 +102,7 @@ flow_injections <-
   # define data block
   orbi_define_block(start_time.min = 0.5, end_time.min = 6.5) |>
   # flag extreme TICxIT values
-  orbi_flag_outliers(agc_window = c(2, 98)) 
+  orbi_flag_outliers(agc_fold_cutoff = 2) 
   # get injection number, and sample name from filename 
 
 flow_injections <- subset(flow_injections, select=-sample_name)
@@ -187,7 +188,7 @@ deltas <-
   ) |>
   select(-is_ref) |>
   arrange(isotopocule, injection)
-deltas |> orbi_export_data_to_excel("nitrate_data_all.xlsx")
+deltas |> orbi_export_data_to_excel("output/nitrate_data_all.xlsx")
 
 # deltas summary
 deltas_summary <- 
@@ -222,7 +223,7 @@ deltas_summary |>
     sample_name, isotopocule_ratio, ratio_expected, n,
     starts_with("ratio_raw"), starts_with("ratio_corrected")
   ) |>
-  orbi_export_data_to_excel("table_nitrate_ratios.xlsx") # exports the final dataset into an Excel file
+  orbi_export_data_to_excel("output/table_nitrate_ratios.xlsx") # exports the final dataset into an Excel file
 ```
 
 
@@ -235,7 +236,7 @@ deltas_summary |>
     isotopocule_ratio, reference, reference_ratio, 
     ratio_corrected_mean, delta_expected, n, delta_mean, delta_sdev
   ) |>
-  orbi_export_data_to_excel("table_nitrate_deltas.xlsx") # exports the final dataset into an Excel file
+  orbi_export_data_to_excel("output/table_nitrate_deltas.xlsx") # exports the final dataset into an Excel file
 ```
 
 
