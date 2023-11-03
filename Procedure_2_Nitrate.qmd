@@ -91,7 +91,7 @@ delta_Sample <- tibble(
 ```{r}
 #| label: data
 flow_injections <- 
-  "data/nitrate" |>
+  "data" |>
   orbi_find_isox() |> # finds all .isox files in a folder
   orbi_read_isox() |> # reads the .isox files into a tibble data frame
   mutate(
@@ -100,7 +100,7 @@ flow_injections <-
   # focus on injections with signal
   #filter(sample_name != Reference &  sample_name != Sample) |>
   # define data block
-  orbi_define_block(start_time.min = 0.5, end_time.min = 6.5) |>
+  orbi_define_block_for_flow_injection(start_time.min = 0.5, end_time.min = 6.5) |>
   # flag extreme TICxIT values
   orbi_flag_outliers(agc_fold_cutoff = 2) 
   # get injection number, and sample name from filename 

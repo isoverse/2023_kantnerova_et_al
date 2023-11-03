@@ -56,7 +56,7 @@ knitr::opts_chunk$set(
 ```{r}
 #| label: isotopocule data
 data <- 
-  "data/replicates" |>
+  "data" |>
   orbi_find_isox() |> # finds all .isox files in a folder
   orbi_read_isox() |> # reads the .isox files into a tibble data frame
   orbi_flag_satellite_peaks() |> # flags minor signals (e.g., satellite peaks) that were reported by IsoX
