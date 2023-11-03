@@ -18,7 +18,7 @@ The quickest and easiest way is to use RStudio.
  1. Download and install [RStudio](http://www.rstudio.com/products/rstudio/download/) for your operating system
  1. Download a [zip file of this repository](https://github.com/KopfLab/2023_kantnerova_et_al/archive/master.zip) and unpack it in an easy to find directory on your computer
  1. Navigate to the directory and double-click the `project.Rproj` file to start RStudio and load this project.
- 1. Install the required libraries by running the following command in the Console in RStudio: `install.packages(c("rlang", "devtools", "tidyverse", "latex2exp", "cowplot", "readxl", "openxlsx", "isoorbi"))` or by installing them manually in RStudio's Packages manager. NOTE: the newest version of `isoorbi` is not on CRAN yet, install it with `devtools::install_github("isoverse/isoorbi", ref = "dev-v1.2")`.
+ 1. Install the required libraries by running the following command in the Console in RStudio: `install.packages(c("rlang", "devtools", "tidyverse", "latex2exp", "cowplot", "readxl", "openxlsx", "isoorbi"))` or by installing them manually in RStudio's Packages manager. NOTE: the newest version of `isoorbi` is not on CRAN yet, install it with `devtools::install_github("isoverse/isoorbi", ref = "dev-v1.3")`.
  1. Open the `.qmd` notebooks in the RStudio file browser (e.g. `shot_noise.qmd`)
  1. To render an HTML report, select File --> Render Document from the menu. The HTML report will be displayed upon successful completion and is saved as a standalone file in the same directory. All generated data figures are saved as PDF and PNG in the `plots` sub-directory. All generated data tables are saved as XLSX in the `output` sub-directory.
  
