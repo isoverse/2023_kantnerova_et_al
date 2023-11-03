@@ -1,0 +1,143 @@
+---
+title: "MRFA Shot Noise Analysis"
+author: "Kantnerova et al. (2023)"
+date: "`r format(Sys.Date(), '%d %b %Y')`"
+number-sections: false
+toc: true
+toc-depth: 2
+fig-width: 8
+fig-height: 6
+df-print: tibble
+embed-resources: true
+format:
+  html:
+    code-tools: true
+    code-fold: false
+    code-summary: "Show the code"
+    toc-float: true
+crossref:
+  fig-prefix: Fig.
+  tbl-prefix: Table
+  ref-hyperlink: true
+editor: source
+editor_options:
+  chunk_output_type: console
+---
+
+# Setup
+
+Using `r R.version.string` , tidyverse version `r packageVersion("tidyverse")`, and isoorbi version `r packageVersion("isoorbi")`.
+
+```{r}
+#| label: setup
+#| message: false
+
+# load packages
+library(isoorbi) # for orbitrap function
+library(dplyr) # for mutating data frames
+library(forcats) # for recoding factors
+library(ggplot2) # for data visualization
+library(cowplot) # arrange multipanel plots
+```
+
+```{r, include=FALSE}
+#| label: global knitting options for code rendering
+knitr::opts_chunk$set(
+  collapse = TRUE, comment = "#>",
+  dev = c("png", "pdf"), fig.keep = "all",
+  dev.args = list(pdf = list(encoding = "WinAnsi", useDingbats = FALSE)),
+  fig.path = sprintf("plots/%s_", gsub("\\.rmarkdown", "", knitr::current_input()))
+)
+```
+
+# Model Peptide (MRFA)
+
+## Data
+
+```{r}
+#| label: calculate shot noise
+data_aas <- 
+  "data" |>
+  orbi_find_isox() |> # finds all .isox files in a folder
+  orbi_read_isox() |> # reads the .isox files into a tibble data frame
+  orbi_simplify_isox() |> # keeps only columns that are directly relevant for isotopocule ratio analysis
+  orbi_flag_satellite_peaks() |> # flags minor signals (e.g., satellite peaks) that were reported by IsoX
+  orbi_flag_weak_isotopocules(min_percent = 10) |> # flags isotopocules that are not consistently detected in most scans
+  orbi_flag_outliers(agc_fold_cutoff = 2) |> # flags outliers based on a TIC x IT criteria
+  orbi_define_basepeak("M0") |> # sets one isotopocule in the data frame as the base peak (ratio denominator)
+  # recode amino acid names to be more easily understandable
+  mutate(
+    compound = compound |>
+      fct_recode(
+        "Alanine" = "Ala_imm",
+        "Arginine" = "Arg_imm",
+        "Methionine" = "Met_imm",
+        "Phenylalanine" = "Phe_imm"
+      )
+  )
+
+shot_noise_aas <-
+  data_aas |>
+  orbi_analyze_shot_noise() |> # does the shot noise calculation
+  orbi_export_data_to_excel("output/shot_noise_MRFA.xlsx") # exports the final dataset into an Excel file
+```
+
+## Table
+
+```{r}
+#| label: example of first few rows
+shot_noise_aas |>
+  arrange(compound, isotopocule, scan.no) |>
+  select(compound, scan.no, time.min, isotopocule,
+         ratio, ratio_rel_se.permil, shot_noise.permil) |>
+  head(10) |>
+  knitr::kable()
+```
+
+## Figure: Amino Acids - Shot Noise
+
+```{r}
+#| label: fig-mrfa-shotnoise
+#| fig-cap: amino acids shotnoise
+#| warning: false
+#| fig-width: 8
+#| fig-height: 10
+shot_noise_aas |>
+  filter(compound == "Methionine" | isotopocule != "2H") |>
+  orbi_plot_shot_noise()
+```
+
+## Figure: Amino Acids satellite peaks
+
+```{r}
+#| label: fig-mrfa-satellite-peaks
+#| fig-cap: Satellite peaks
+#| fig-width: 10
+#| fig-height: 9
+#| warning: false
+data_aas |> orbi_plot_satellite_peaks()
+```
+
+## Figure: Amino Acids isotopocule coverage
+
+```{r}
+#| label: fig-mrfa-isotopocule-coverage
+#| fig-cap: Isotopocule coverage
+#| fig-width: 10
+#| fig-height: 9
+#| warning: false
+data_aas |> orbi_plot_isotopocule_coverage()
+```
+
+## Figure: Amino Acids ratios
+
+```{r}
+#| label: fig-mrfa-ratios
+#| fig-cap: Isotopocule ratios vs. M0
+#| fig-width: 10
+#| fig-height: 9
+#| warning: false
+data_aas |> orbi_plot_raw_data(y = ratio)
+```
+
+

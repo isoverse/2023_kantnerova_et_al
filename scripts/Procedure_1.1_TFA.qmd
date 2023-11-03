@@ -1,0 +1,141 @@
+---
+title: "TFA Shot Noise Analysis"
+author: "Kantnerova et al. (2023)"
+date: "`r format(Sys.Date(), '%d %b %Y')`"
+number-sections: false
+toc: true
+toc-depth: 2
+fig-width: 8
+fig-height: 6
+df-print: tibble
+embed-resources: true
+format:
+  html:
+    code-tools: true
+    code-fold: false
+    code-summary: "Show the code"
+    toc-float: true
+crossref:
+  fig-prefix: Fig.
+  tbl-prefix: Table
+  ref-hyperlink: true
+editor: source
+editor_options:
+  chunk_output_type: console
+---
+
+# Setup
+
+Using `r R.version.string` , tidyverse version `r packageVersion("tidyverse")`, and isoorbi version `r packageVersion("isoorbi")`.
+
+```{r}
+#| label: setup
+#| message: false
+
+# load packages
+library(isoorbi) # for orbitrap function
+library(dplyr) # for mutating data frames
+library(forcats) # for recoding factors
+library(ggplot2) # for data visualization
+library(cowplot) # arrange multipanel plots
+```
+
+```{r, include=FALSE}
+#| label: global knitting options for code rendering
+knitr::opts_chunk$set(
+  collapse = TRUE, comment = "#>",
+  dev = c("png", "pdf"), fig.keep = "all",
+  dev.args = list(pdf = list(encoding = "WinAnsi", useDingbats = FALSE)),
+  fig.path = sprintf("plots/%s_", gsub("\\.rmarkdown", "", knitr::current_input()))
+)
+```
+
+# Trifluoroacetate (TFA)
+
+## Data
+
+```{r}
+#| label: load, process, and export TFA data
+data_tfa <- 
+  "data" |>
+  orbi_find_isox() |> # finds all .isox files in a folder
+  orbi_read_isox() |> # reads the .isox files into a tibble data frame
+  orbi_simplify_isox() |> # keeps only columns that are directly relevant for isotopocule ratio analysis
+  orbi_flag_satellite_peaks() |> # flags minor signals (e.g., satellite peaks) that were reported by IsoX
+  orbi_flag_weak_isotopocules(min_percent = 10) |> # flags isotopocules that are not consistently detected in most scans
+  orbi_flag_outliers(agc_fold_cutoff = 2) |> # flags outliers based on a TIC x IT criteria
+  orbi_define_basepeak("M0") # sets one isotopocule in the data frame as the base peak (ratio denominator)
+  
+shot_noise_tfa <- 
+  data_tfa |>
+  orbi_analyze_shot_noise() |> # does the shot noise calculation
+  orbi_export_data_to_excel("output/shot_noise_tfa.xlsx") # exports the final dataset into an Excel file
+```
+
+
+## Figure: TFA shotnoise vs counts/time
+
+```{r}
+#| label: fig-tfa-shotnoise
+#| fig-cap: Shot noise vs counts and vs time.
+#| fig-width: 10
+#| fig-height: 5
+#| warning: false
+
+# a shot-noise plot for the first file only
+# individual plots
+tfa_vs_ions <-
+  shot_noise_tfa |>
+  orbi_filter_isox(filename = levels(shot_noise_tfa$filename)[1]) |>
+  orbi_plot_shot_noise(x = "n_effective_ions") +
+  labs(title = "vs counts") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+tfa_vs_time <-
+  shot_noise_tfa |>
+  orbi_filter_isox(filename = levels(shot_noise_tfa$filename)[1]) |>
+  orbi_plot_shot_noise(permil_target = 1) +
+  labs(title = "vs time") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# combine
+plot_grid(
+  tfa_vs_ions + theme(legend.position = c(0.85, 0.74)), 
+  tfa_vs_time + theme(legend.position = "none"),
+  align = "h", nrow = 1, axis = "tb"
+)
+```
+
+## Figure: TFA satellite peaks
+
+```{r}
+#| label: fig-tfa-satellite-peaks
+#| fig-cap: Satellite peaks
+#| fig-width: 15
+#| fig-height: 5
+#| warning: false
+data_tfa |> orbi_plot_satellite_peaks()
+```
+
+## Figure: TFA isotopocule coverage
+
+```{r}
+#| label: fig-tfa-isotopocule-coverage
+#| fig-cap: Isotopocule coverage
+#| fig-width: 15
+#| fig-height: 3
+#| warning: false
+data_tfa |> orbi_plot_isotopocule_coverage()
+```
+
+## Figure: TFA ratios
+
+```{r}
+#| label: fig-tfa-ratios
+#| fig-cap: Isotopocule ratios vs. M0
+#| fig-width: 15
+#| fig-height: 5
+#| warning: false
+data_tfa |> orbi_plot_raw_data(y = ratio)
+```
+
