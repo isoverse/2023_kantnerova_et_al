@@ -12,6 +12,7 @@
 *.csv
 *cache/**/*
 output/**/*
+tmp/**/*
 
 # explicitly allow all files in data (by default)
 !data/**/*
