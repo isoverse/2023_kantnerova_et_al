@@ -14,18 +14,12 @@
 output/**/*
 tmp/**/*
 
-# explicitly allow all files in data (by default)
+# explicitly allow all files in data (by default), except .raw  
 !data/**/*
 *.raw
 
-# allow all files in documents (by default)
-!documents/**/*
-
-# allow all files in presentations (by default)
-!presentations/**/*
-
-# allow all files in docs
-!docs/**/*
+# example files in scripts subfolder are excluded
+scripts/**/*
 
 # OS generated files
 .DS_Store
