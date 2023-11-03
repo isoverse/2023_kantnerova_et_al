@@ -58,12 +58,12 @@ knitr::opts_chunk$set(
 # isotopocules data
 data <- 
   "data/replicates" |>
-  orbi_find_isox() |>
-  orbi_read_isox() |>
-  orbi_flag_satellite_peaks() |>
-  orbi_flag_weak_isotopocules(min_percent = 30) |>
-  orbi_flag_outliers(agc_window = c(5, 95)) |>
-  orbi_filter_flagged_data() |>
+  orbi_find_isox() |> # finds all .isox files in a folder
+  orbi_read_isox() |> # reads the .isox files into a tibble data frame
+  orbi_flag_satellite_peaks() |> # flags minor signals (e.g., satellite peaks) that were reported by IsoX
+  orbi_flag_weak_isotopocules(min_percent = 30) |> # flags isotopocules that are not consistently detected in most scans
+  orbi_flag_outliers(agc_fold_cutoff = 2) |> # flags outliers based on a TIC x IT criteria
+  
   # pull out replicate from filename
   mutate(
     replicate = str_extract(filename, "Replicate_\\d") |> str_replace("_", " ")
@@ -92,30 +92,18 @@ ratios <- data |>
 ```{r}
 #| label: fig-11-replicates-top
 
-p_top <- 
-  data |>
-  filter(isotopocule == "M0") |>
-  # plot setup
-  ggplot() +
-  aes(time.min, intensity, color = compound) + 
-  geom_line() +
-  facet_grid(. ~ replicate) +
-  # scales
-  scale_y_log10(
-    breaks = c(5e6, 1e7, 2e7), 
-    labels = expression(5 %*% 10^6, 1%*%10^7, 2%*%10^7)) +
-  scale_color_brewer(palette = "Dark2") +
-  scale_x_continuous(breaks = c(5, 10), expand = c(0, 0)) +
-  expand_limits(x = 0) + 
-  # labels 
+p_top <- data |>
+  orbi_plot_raw_data(
+    isotopocules = "M0",
+    x_breaks = c(5, 10),
+    y = intensity,
+    y_scale = "log",
+    color = compound,
+    show_outliers = FALSE
+  ) +
+  facet_wrap(~replicate, nrow = 1) +
   labs(x = "time / min", y = "EIC / arb. unit") +
-  # theme
-  theme_bw() +
-  theme(
-    text = element_text(size = 16),
-    panel.grid = element_blank(),
-    strip.background = element_blank()
-  )
+  theme(strip.text = element_text(size = 16))
 p_top
 ```
 

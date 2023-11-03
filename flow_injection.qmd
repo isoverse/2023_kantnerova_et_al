@@ -71,9 +71,9 @@ flow_injections <-
   # focus on injections with signal
   filter(injection > 1, injection < 15) |>
   # define data block
-  orbi_define_block(start_time.min = 0.5, end_time.min = 6.5) |>
+  orbi_define_block_for_flow_injection(start_time.min = 0.5, end_time.min = 6.5) |>
   # flag extreme TICxIT values
-  orbi_flag_outliers(agc_window = c(5, 95)) 
+  orbi_flag_outliers(agc_fold_cutoff = 2) 
 ```
 
 # Calculations
@@ -94,8 +94,6 @@ flow_injections_ratios <-
 # ratio summary
 flow_injections_summary <- 
   flow_injections_w_basepeak |>
-  # filter out the outliers flagged earlier
-  orbi_filter_flagged_data() |>
   orbi_summarize_results(ratio_method = "sum") |>
   mutate(
     tuning = filename |> str_extract("bad|optimal"),

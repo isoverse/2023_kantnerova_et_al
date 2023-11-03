@@ -64,9 +64,8 @@ shot_noise_tfa <-
   orbi_simplify_isox() |>
   orbi_flag_satellite_peaks() |>
   orbi_flag_weak_isotopocules(min_percent = 10) |>
-  orbi_flag_outliers(agc_window = c(2.1, 97.9)) |>
+  orbi_flag_outliers(agc_fold_cutoff = 2) |>
   orbi_define_basepeak("M0") |>
-  orbi_filter_flagged_data() |>
   orbi_analyze_shot_noise() |>
   orbi_export_data_to_excel("output/shot_noise_tfa.xlsx")
 ```
@@ -159,9 +158,8 @@ shot_noise_aas <-
   orbi_simplify_isox() |>
   orbi_flag_satellite_peaks() |>
   orbi_flag_weak_isotopocules(min_percent = 10) |>
-  orbi_flag_outliers(agc_window = c(2.1, 97.9)) |>
+  orbi_flag_outliers(agc_fold_cutoff = 2) |>
   orbi_define_basepeak("M0") |>
-  orbi_filter_flagged_data() |>
   orbi_analyze_shot_noise() |>
   orbi_export_data_to_excel("output/shot_noise_amino_acids.xlsx")
 ```

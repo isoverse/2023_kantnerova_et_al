@@ -61,7 +61,7 @@ data <-
   orbi_read_isox() |> # reads the .isox files into a tibble data frame
   orbi_flag_satellite_peaks() |> # flags minor signals (e.g., satellite peaks) that were reported by IsoX
   orbi_flag_weak_isotopocules(min_percent = 30) |> # flags isotopocules that are not consistently detected in most scans
-  orbi_flag_outliers(agc_fold_cutoff = 1.05) |> # flags outliers based on a TIC x IT criteria
+  orbi_flag_outliers(agc_fold_cutoff = 2) |> # flags outliers based on a TIC x IT criteria
   
   # pull out replicate from filename
   mutate(
