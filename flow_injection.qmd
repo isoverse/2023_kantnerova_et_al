@@ -15,7 +15,6 @@ format:
     code-fold: false
     code-summary: "Show the code"
     toc-float: true
-bibliography: references.bib
 crossref:
   fig-prefix: Fig.
   tbl-prefix: Table
@@ -27,7 +26,7 @@ editor_options:
 
 # Setup
 
-Using `r R.version.string` , @R, tidyverse version `r packageVersion("tidyverse")`, @tidyverse, and isoorbi version `r packageVersion("isoorbi")`.
+Using `r R.version.string` , tidyverse version `r packageVersion("tidyverse")`, and isoorbi version `r packageVersion("isoorbi")`.
 
 ```{r}
 #| label: setup
@@ -54,26 +53,46 @@ knitr::opts_chunk$set(
 
 # Data
 
+## Optimal tuning
+
 ```{r}
-flow_injections <- 
-  "data/nitrate" |>
+flow_injections_optimal <-
+  "data/nitrate/optimal_tuning" |>
   orbi_find_isox() |>
   orbi_read_isox() |>
-  # get injection number, and sample name from filename and add tuning to filename
+  orbi_simplify_isox() |>
+  # get injection number and sample name from filename
   mutate(
-    tuning = filepath |> dirname() |> basename() |> str_extract("bad|optimal"),
     injection = filename |> str_extract("\\d+$") |> as.integer(),
-    sample_name = ifelse(injection %% 2 == 0, "USGS35", "USGS32"),
-    filename = paste(tuning, filename),
-    .after = 1L
+    sample_name = ifelse(injection %% 2 == 0, "USGS35", "USGS32")
   ) |>
-  orbi_simplify_isox(add = c("intensity", "tuning", "injection", "sample_name")) |>
   # focus on injections with signal
   filter(injection > 1, injection < 15) |>
   # define data block
   orbi_define_block_for_flow_injection(start_time.min = 0.5, end_time.min = 6.5) |>
   # flag extreme TICxIT values
-  orbi_flag_outliers(agc_fold_cutoff = 2) 
+  orbi_flag_outliers(agc_fold_cutoff = 2)
+```
+
+## Bad tuning
+
+```{r}
+flow_injections_bad <-
+  "data/nitrate/bad_tuning" |>
+  orbi_find_isox() |>
+  orbi_read_isox() |>
+  orbi_simplify_isox() |>
+  # get injection number and sample name from filename
+  mutate(
+    injection = filename |> str_extract("\\d+$") |> as.integer(),
+    sample_name = ifelse(injection %% 2 == 0, "USGS35", "USGS32")
+  ) |>
+  # focus on injections with signal
+  filter(injection > 1, injection < 15) |>
+  # define data block
+  orbi_define_block_for_flow_injection(start_time.min = 0.5, end_time.min = 6.5) |>
+  # flag extreme TICxIT values
+  orbi_flag_outliers(agc_fold_cutoff = 2)
 ```
 
 # Calculations
@@ -81,24 +100,25 @@ flow_injections <-
 ## Ratios
 
 ```{r}
-# with basepeak
-flow_injections_w_basepeak <- 
-  flow_injections |>
+# basepeak & ratios
+flow_injections_optimal_w_basepeak <- 
+  flow_injections_optimal |>
   orbi_define_basepeak("M0")
 
-# ratios
-flow_injections_ratios <- 
-  flow_injections_w_basepeak |>
-  orbi_calculate_ratios()
+flow_injections_bad_w_basepeak <- 
+  flow_injections_bad |>
+  orbi_define_basepeak("M0")
 
-# ratio summary
-flow_injections_summary <- 
-  flow_injections_w_basepeak |>
+# ratio summaries
+flow_injections_optimal_summary <- 
+  flow_injections_optimal_w_basepeak |>
   orbi_summarize_results(ratio_method = "sum") |>
-  mutate(
-    tuning = filename |> str_extract("bad|optimal"),
-    is_ref = sample_name == "USGS35"
-  )
+  mutate(is_ref = sample_name == "USGS35")
+
+flow_injections_bad_summary <- 
+  flow_injections_bad_w_basepeak |>
+  orbi_summarize_results(ratio_method = "sum") |>
+  mutate(is_ref = sample_name == "USGS35")
 ```
 
 ## Deltas
@@ -120,18 +140,20 @@ delta_USGS32 <- tibble(
 )
 
 # delta ratios
-delta_ratios <-
-  flow_injections_summary |>
-  filter(data_type == "data") |>
+ratios <-
+  bind_rows(
+    flow_injections_optimal_summary |> mutate(tuning = "optimal"),
+    flow_injections_bad_summary |> mutate(tuning = "bad")
+  ) |>
   select(tuning, is_ref, injection, isotopocule, basepeak, ratio, ratio_sem)
 
 # calculate deltas by bracketing
 deltas <- 
-  delta_ratios |>
+  ratios |>
   # bracketing
   filter(!is_ref) |>
   left_join(
-    delta_ratios |> 
+    ratios |> 
       filter(is_ref) |> 
       rename(
         ref_before = injection, ref_before_ratio = ratio, 
@@ -141,7 +163,7 @@ deltas <-
     relationship = "many-to-many") |>
   filter(injection == ref_before + 1L) |>
   left_join(
-    delta_ratios |> 
+    ratios |> 
       filter(is_ref) |> 
       rename(
         ref_after = injection, ref_after_ratio = ratio, 
@@ -189,7 +211,9 @@ deltas_summary <-
   select(-isotopocule)
 ```
 
-# Table 2
+# Tables
+
+## Table 2
 
 ```{r}
 deltas_summary |>
@@ -201,8 +225,7 @@ deltas_summary |>
   orbi_export_data_to_excel("output/table2_nitrate_ratios.xlsx")
 ```
 
-
-# Table 3
+## Table 3
 
 ```{r}
 deltas_summary |>
@@ -214,8 +237,7 @@ deltas_summary |>
   orbi_export_data_to_excel("output/table3_nitrate_deltas.xlsx")
 ```
 
-
-# Table 4
+## Table 4
 
 ```{r}
 deltas_summary |>
@@ -227,66 +249,86 @@ deltas_summary |>
   orbi_export_data_to_excel("output/table4_nitrate_deltas_bad_tuning.xlsx")
 ```
 
-# Figure 12 panel a (EIC trace)
+# Figures
+
+## Bonus Figure: raw ratios
+
+```{r}
+#| label: fig-nitrate-ratios
+#| fig-cap: Isotopocule ratios vs. M0
+#| fig-width: 12
+#| fig-height: 10
+#| warning: false
+flow_injections_optimal_w_basepeak |> orbi_plot_raw_data(y = ratio) 
+```
+
+## Figure 12 panel a (EIC trace)
 
 ```{r}
 #| label: fig-12-nitrate-a
+#| fig-cap: nitrate measurements panel a
+#| warning: false
+#| fig-width: 10
+#| fig-height: 4
 
-# base plot
-base_plot <- 
-  ggplot() +
-  aes(time.min, intensity, color = sample_name) +
-  geom_line() +
-  # set scales
-  scale_x_continuous(expand = c(0, 0)) +
-  scale_color_brewer(palette = "Dark2") +
+fig_a <- flow_injections_bad |>
+  orbi_plot_raw_data(
+    isotopocule = "M0", 
+    y = intensity, 
+    y_scale = "log",
+    color = sample_name,
+    show_outliers = FALSE
+  ) +
+  # customize intensity plot
   facet_grid(. ~ injection, scales = "free_x", space = "free_x") +
-  # theme definitions
-  theme_bw() +
+  coord_cartesian(ylim = c(3.1e7, 1.2e9)) +
+  labs(y = "EIC nitrate / arb. unit") +
   theme(
-    text = element_text(size = 16),
-    strip.background = element_blank(),
-    panel.grid = element_blank(),
-    panel.spacing = unit(0, "npc"),
+    axis.title.x = element_blank(),
     axis.text.x = element_blank(),
     axis.ticks.x = element_blank()
-  ) +
-  labs(color = NULL, x = NULL)
-
-# plot EIC of the M0 ion
-fig_a <- base_plot %+%
-  filter(flow_injections, tuning == "bad", isotopocule == "M0") %+%
-  aes(y = intensity) +
-  scale_y_continuous(
-    trans = scales::pseudo_log_trans(),
-    breaks = 10^(6:10), labels = scales::label_log()
-  ) +
-  coord_cartesian(ylim = c(3.1e7, 1.2e9)) +
-  labs(y = "EIC nitrate / arb. unit")
+  )
 fig_a
 ```
 
-# Figure 12 panel b (ratio trace)
+## Figure 12 panel b (ratio trace)
 
 ```{r}
 #| label: fig-12-nitrate-b
+#| fig-cap: nitrate measurements panel b
+#| fig-width: 10
+#| fig-height: 4
 
-# plot ratio of 18O/M0
 fig_b <- 
-  base_plot %+% 
-  filter(flow_injections_ratios, tuning == "bad", isotopocule == "18O") %+% 
-  aes(y = ratio)
+  flow_injections_bad_w_basepeak |>
+  orbi_plot_raw_data(
+    isotopocule = "18O", 
+    y = ratio, 
+    color = sample_name,
+    show_outliers = FALSE
+  ) +
+  # customize ratio plot
+  facet_grid(. ~ injection, scales = "free_x", space = "free_x") +
+  theme(
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
+  )
 fig_b
 ```
 
-# Figure 12 panel c (ratios)
+
+## Figure 12 panel c (ratios)
 
 ```{r}
 #| label: fig-12-nitrate-c
+#| fig-cap: nitrate measurements panel c
+#| fig-width: 6
+#| fig-height: 4
 
 fig_c <- 
-  flow_injections_summary |>
-  filter(data_type == "data", tuning == "bad", isotopocule == "18O") |>
+  flow_injections_bad_summary |>
+  filter(isotopocule == "18O") |>
   # plot
   ggplot() +
   aes(
@@ -319,23 +361,25 @@ fig_c <-
 fig_c
 ```
 
-# Figure 12 panel d (delta values)
+## Figure 12 panel d (delta values)
 
 ```{r}
 #| label: fig-12-nitrate-d
+#| fig-cap: nitrate measurements panel d
 #| message: false
 #| warning: false
+#| fig-width: 6
+#| fig-height: 4
 fig_d <- fig_c %+%
   filter(deltas, tuning == "bad", isotopocule == "18O") %+%
   aes(y = delta, ymin = delta - delta_sem, ymax = delta + delta_sem) +
-  #scale_y_continuous(breaks = 25:35, labels = function(x) paste0(x, "\U2030")) +
-  scale_y_continuous(breaks = 25:35) +
-  labs(y = expression(delta^18*O~"(USGS32 vs. VSMOW) in permil"))
+  scale_y_continuous(breaks = 25:35, labels = function(x) paste0(x, "\U2030")) +
+  labs(y = expression(delta^18*O~"(USGS32 vs. VSMOW)"))
 fig_d
 ```
 
 
-# Figure 12 combined
+## Figure 12 combined
 
 ```{r}
 #| label: fig-12-nitrate
@@ -360,5 +404,3 @@ fig_ab <-
 plot_grid(fig_ab, fig_cd, ncol = 1, rel_heights = c(2, 1))
 ```
 
-
-# References
