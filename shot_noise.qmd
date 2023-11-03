@@ -15,7 +15,6 @@ format:
     code-fold: false
     code-summary: "Show the code"
     toc-float: true
-bibliography: references.bib
 crossref:
   fig-prefix: Fig.
   tbl-prefix: Table
@@ -27,7 +26,7 @@ editor_options:
 
 # Setup
 
-Using `r R.version.string` , @R, tidyverse version `r packageVersion("tidyverse")`, @tidyverse, and isoorbi version `r packageVersion("isoorbi")`.
+Using `r R.version.string` , tidyverse version `r packageVersion("tidyverse")`, and isoorbi version `r packageVersion("isoorbi")`.
 
 ```{r}
 #| label: setup
@@ -57,7 +56,7 @@ knitr::opts_chunk$set(
 
 ```{r}
 # load, process, and export tfa data
-shot_noise_tfa <-
+data_tfa <-
   "data/shot_noise/tfa" |>
   orbi_find_isox() |>
   orbi_read_isox() |>
@@ -65,9 +64,45 @@ shot_noise_tfa <-
   orbi_flag_satellite_peaks() |>
   orbi_flag_weak_isotopocules(min_percent = 10) |>
   orbi_flag_outliers(agc_fold_cutoff = 2) |>
-  orbi_define_basepeak("M0") |>
+  orbi_define_basepeak("M0")
+
+shot_noise_tfa <- 
+  data_tfa |>
   orbi_analyze_shot_noise() |>
   orbi_export_data_to_excel("output/shot_noise_tfa.xlsx")
+```
+
+## Bonus Figure: TFA satellite peaks
+
+```{r}
+#| label: fig-bonus-tfa-satellite-peaks
+#| fig-cap: Satellite peaks
+#| fig-width: 15
+#| fig-height: 5
+#| warning: false
+data_tfa |> orbi_plot_satellite_peaks()
+```
+
+## Bonus Figure: TFA isotopocule coverage
+
+```{r}
+#| label: fig-bonus-tfa-isotopocule-coverage
+#| fig-cap: Isotopocule coverage
+#| fig-width: 15
+#| fig-height: 3
+#| warning: false
+data_tfa |> orbi_plot_isotopocule_coverage()
+```
+
+## Bonus Figure: TFA ratios
+
+```{r}
+#| label: fig-bonus-tfa-ratios
+#| fig-cap: Isotopocule ratios vs. M0
+#| fig-width: 15
+#| fig-height: 5
+#| warning: false
+data_tfa |> orbi_plot_raw_data(y = ratio)
 ```
 
 ## Figure 10: TFA shotnoise vs counts/time
@@ -83,18 +118,21 @@ shot_noise_tfa <-
 tfa_vs_ions <-
   shot_noise_tfa |>
   orbi_filter_isox(filename = "TFA_M0_1uscan_15kRes") |>
-  orbi_plot_shot_noise(x = "n_effective_ions")
+  orbi_plot_shot_noise(x = "n_effective_ions") +
+  labs(title = "vs counts") +
+  theme(plot.title = element_text(hjust = 0.5))
+
 tfa_vs_time <-
   shot_noise_tfa |>
   orbi_filter_isox(filename = "TFA_M0_1uscan_15kRes") |>
-  orbi_plot_shot_noise(permil_target = 1)
+  orbi_plot_shot_noise(permil_target = 1) +
+  labs(title = "vs time") +
+  theme(plot.title = element_text(hjust = 0.5))
 
 # combine
 plot_grid(
-  tfa_vs_ions + facet_wrap(~"vs counts") +
-    theme(legend.position = c(0.85, 0.74)),
-  tfa_vs_time + facet_wrap(~"vs time") +
-    theme(legend.position = "none"),
+  tfa_vs_ions + theme(legend.position = c(0.85, 0.74)), 
+  tfa_vs_time + theme(legend.position = "none"),
   align = "h", nrow = 1, axis = "tb"
 )
 ```
@@ -120,7 +158,7 @@ shot_noise_tfa |>
   orbi_plot_shot_noise(color = "IT_info") +
   # wrap by the ratio label
   facet_wrap(~ratio_label) +
-  theme(legend.position = c(0.41, 0.77))
+  theme(legend.position = c(0.41, 0.75))
 ```
 
 ## Extended Data Figure 7: TFA shotnoise at different resolutions
@@ -144,7 +182,7 @@ shot_noise_tfa |>
   orbi_plot_shot_noise(color = "res_info") +
   # wrap by the ratio label
   facet_wrap(~ratio_label) +
-  theme(legend.position = c(0.42, 0.77))
+  theme(legend.position = c(0.42, 0.75))
 ```
 
 # Model Peptide (MRFA)
@@ -152,16 +190,30 @@ shot_noise_tfa |>
 ## Data
 
 ```{r}
-shot_noise_aas <-
-  "data/shot_noise/mrfa/MRFA_M1_40NCE_10min_10uscans.isox" |>
+# load, process, and export mrfa data
+data_aas <- 
+  "data/shot_noise/mrfa" |>
+  orbi_find_isox() |>
   orbi_read_isox() |>
   orbi_simplify_isox() |>
   orbi_flag_satellite_peaks() |>
-  orbi_flag_weak_isotopocules(min_percent = 10) |>
-  orbi_flag_outliers(agc_fold_cutoff = 2) |>
+  orbi_flag_weak_isotopocules(min_percent = 10) |> 
+  orbi_flag_outliers(agc_fold_cutoff = 2) |> 
   orbi_define_basepeak("M0") |>
-  orbi_analyze_shot_noise() |>
-  orbi_export_data_to_excel("output/shot_noise_amino_acids.xlsx")
+  mutate(
+    compound = compound |>
+      fct_recode(
+        "Alanine" = "Ala_imm",
+        "Arginine" = "Arg_imm",
+        "Methionine" = "Met_imm",
+        "Phenylalanine" = "Phe_imm"
+      )
+  )
+
+shot_noise_aas <-
+  data_aas |>
+  orbi_analyze_shot_noise() |> 
+  orbi_export_data_to_excel("output/shot_noise_MRFA.xlsx") 
 ```
 
 ## Table
@@ -170,10 +222,43 @@ shot_noise_aas <-
 # example of first few rows
 shot_noise_aas |>
   arrange(compound, isotopocule, scan.no) |>
-  head(10) |>
   select(compound, scan.no, time.min, isotopocule,
          ratio, ratio_rel_se.permil, shot_noise.permil) |>
+  head(10) |>
   knitr::kable()
+```
+
+## Bonus Figure: Amino Acids satellite peaks
+
+```{r}
+#| label: fig-bonus-mrfa-satellite-peaks
+#| fig-cap: Satellite peaks
+#| fig-width: 10
+#| fig-height: 9
+#| warning: false
+data_aas |> orbi_plot_satellite_peaks()
+```
+
+## Bonus Figure: Amino Acids isotopocule coverage
+
+```{r}
+#| label: fig-bonus-mrfa-isotopocule-coverage
+#| fig-cap: Isotopocule coverage
+#| fig-width: 10
+#| fig-height: 9
+#| warning: false
+data_aas |> orbi_plot_isotopocule_coverage()
+```
+
+## Bonus Figure: Amino Acids ratios
+
+```{r}
+#| label: fig-bonus-mrfa-ratios
+#| fig-cap: Isotopocule ratios vs. M0
+#| fig-width: 10
+#| fig-height: 9
+#| warning: false
+data_aas |> orbi_plot_raw_data(y = ratio)
 ```
 
 ## Extended Data Figure 8: Amino Acids Shot Noise
@@ -183,20 +268,8 @@ shot_noise_aas |>
 #| fig-cap: amino acids shotnoise
 #| warning: false
 #| fig-width: 8
-#| fig-height: 8
+#| fig-height: 10
 shot_noise_aas |>
-  filter(compound == "Met_imm" | isotopocule != "2H") |>
-  # change panel titles
-  mutate(
-    compound = compound |>
-      fct_recode(
-        "Alanine" = "Ala_imm",
-        "Arginine" = "Arg_imm",
-        "Methionine" = "Met_imm",
-        "Phenylalanine" = "Phe_imm"
-      )
-  ) |>
+  filter(compound == "Methionine" | isotopocule != "2H") |>
   orbi_plot_shot_noise()
 ```
-
-# References
