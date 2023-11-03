@@ -254,7 +254,7 @@ deltas_summary |>
 ## Bonus Figure: raw ratios
 
 ```{r}
-#| label: fig-nitrate-ratios
+#| label: fig-bonus-nitrate-ratios
 #| fig-cap: Isotopocule ratios vs. M0
 #| fig-width: 12
 #| fig-height: 10
