@@ -15,7 +15,6 @@ format:
     code-fold: false
     code-summary: "Show the code"
     toc-float: true
-bibliography: references.bib
 crossref:
   fig-prefix: Fig.
   tbl-prefix: Table
@@ -27,7 +26,7 @@ editor_options:
 
 # Setup
 
-Using `r R.version.string` , @R, tidyverse version `r packageVersion("tidyverse")`, @tidyverse, and isoorbi version `r packageVersion("isoorbi")`.
+Using `r R.version.string` , tidyverse version `r packageVersion("tidyverse")`, and isoorbi version `r packageVersion("isoorbi")`.
 
 ```{r}
 #| label: setup
@@ -58,12 +57,12 @@ knitr::opts_chunk$set(
 # isotopocules data
 data <- 
   "data/replicates" |>
-  orbi_find_isox() |> # finds all .isox files in a folder
-  orbi_read_isox() |> # reads the .isox files into a tibble data frame
-  orbi_flag_satellite_peaks() |> # flags minor signals (e.g., satellite peaks) that were reported by IsoX
-  orbi_flag_weak_isotopocules(min_percent = 30) |> # flags isotopocules that are not consistently detected in most scans
-  orbi_flag_outliers(agc_fold_cutoff = 2) |> # flags outliers based on a TIC x IT criteria
-  
+  orbi_find_isox() |>
+  orbi_read_isox() |>
+  orbi_flag_satellite_peaks() |> 
+  orbi_flag_weak_isotopocules(min_percent = 30) |> 
+  # very tight agc data, discard anything that's 5% above or below the mean
+  orbi_flag_outliers(agc_fold_cutoff = 1.05) |>
   # pull out replicate from filename
   mutate(
     replicate = str_extract(filename, "Replicate_\\d") |> str_replace("_", " ")
@@ -91,6 +90,8 @@ ratios <- data |>
 
 ```{r}
 #| label: fig-11-replicates-top
+#| fig-width: 10
+#| fig-height: 3
 
 p_top <- data |>
   orbi_plot_raw_data(
@@ -111,6 +112,8 @@ p_top
 
 ```{r}
 #| label: fig-11-replicates-bottom
+#| fig-width: 8
+#| fig-height: 5
 
 p_bottom <- 
   ratios |>
@@ -175,4 +178,3 @@ plot_grid(
 )
 ```
 
-# References
