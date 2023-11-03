@@ -107,7 +107,7 @@ shot_noise_aas |>
   orbi_plot_shot_noise()
 ```
 
-## Bonus Figure: Amino Acids satellite peaks
+## Figure: Amino Acids satellite peaks
 
 ```{r}
 #| label: fig-mrfa-satellite-peaks
@@ -118,7 +118,7 @@ shot_noise_aas |>
 data_aas |> orbi_plot_satellite_peaks()
 ```
 
-## Bonus Figure: Amino Acids isotopocule coverage
+## Figure: Amino Acids isotopocule coverage
 
 ```{r}
 #| label: fig-mrfa-isotopocule-coverage
@@ -129,7 +129,7 @@ data_aas |> orbi_plot_satellite_peaks()
 data_aas |> orbi_plot_isotopocule_coverage()
 ```
 
-## Bonus Figure: Amino Acids ratios
+## Figure: Amino Acids ratios
 
 ```{r}
 #| label: fig-mrfa-ratios
