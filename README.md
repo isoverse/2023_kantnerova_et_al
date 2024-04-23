@@ -1,6 +1,7 @@
-# Kantnerová et al. (2023) supplemental
+# Kantnerová et al. (2024) supplemental
 
-This repository holds data and source code for *Kantnerová, K, Kuhlbusch, N, Juchelka, D, Hilkert, A, Kopf, S, Neubauer, C. ESI-Orbitrap IRMS: A Guide to Precision Isotopocule Analysis for Life and Environmental Scientists. Nature Protocols, 2023*.
+This repository holds data and source code for [*Kantnerová, K, Kuhlbusch, N, Juchelka, D, Hilkert, A, Kopf, S, Neubauer, C. A guide to precise measurements of
+isotope abundance by ESI-Orbitrap MS. Nature Protocols, 2024*](https://doi.org/10.1038/s41596-024-00981-5).
 
 ## What can I do with this code? <a href="https://creativecommons.org/licenses/by/4.0/"><img src="https://mirrors.creativecommons.org/presskit/buttons/88x31/png/by.png" align = "right" width = "100"/></a>
 
