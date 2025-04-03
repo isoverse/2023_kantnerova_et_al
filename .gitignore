@@ -11,7 +11,6 @@
 *.xlsx
 *.csv
 *cache/**/*
-output/**/*
 tmp/**/*
 
 # explicitly allow all files in data (by default), except .raw  
